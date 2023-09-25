@@ -1,6 +1,9 @@
 import copy
 from typing import Any, Iterator, Optional, Tuple, Type, Union
 
+import numpy as np
+import torch
+
 
 class BaseDataElement:
     """A base data interface that supports Tensor-like and dict-like
@@ -472,6 +475,96 @@ class BaseDataElement:
                     f'because {name} is already a metainfo field')
             self._data_fields.add(name)
         super().__setattr__(name, value)
+
+    # Tensor-like methods
+    def to(self, *args, **kwargs) -> 'BaseDataElement':
+        """Apply same name function to all tensors in data_fields."""
+        new_data = self.new()
+        for k, v in self.items():
+            if hasattr(v, 'to'):
+                v = v.to(*args, **kwargs)
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    # Tensor-like methods
+    def cpu(self) -> 'BaseDataElement':
+        """Convert all tensors to CPU in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.cpu()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    # Tensor-like methods
+    def cuda(self) -> 'BaseDataElement':
+        """Convert all tensors to GPU in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.cuda()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    # Tensor-like methods
+    def npu(self) -> 'BaseDataElement':
+        """Convert all tensors to NPU in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.npu()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    def mlu(self) -> 'BaseDataElement':
+        """Convert all tensors to MLU in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.mlu()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    # Tensor-like methods
+    def detach(self) -> 'BaseDataElement':
+        """Detach all tensors in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.detach()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    # Tensor-like methods
+    def numpy(self) -> 'BaseDataElement':
+        """Convert all tensors to np.ndarray in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            if isinstance(v, (torch.Tensor, BaseDataElement)):
+                v = v.detach().cpu().numpy()
+                data = {k: v}
+                new_data.set_data(data)
+        return new_data
+
+    def to_tensor(self) -> 'BaseDataElement':
+        """Convert all np.ndarray to tensor in data."""
+        new_data = self.new()
+        for k, v in self.items():
+            data = {}
+            if isinstance(v, np.ndarray):
+                v = torch.from_numpy(v)
+                data[k] = v
+            elif isinstance(v, BaseDataElement):
+                v = v.to_tensor()
+                data[k] = v
+            new_data.set_data(data)
+        return new_data
 
     def to_dict(self) -> dict:
         """Convert BaseDataElement to dict."""

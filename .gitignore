@@ -121,3 +121,9 @@ work_dirs/
 *.pth
 *.py~
 *.sh~
+
+# Backend model
+*.engine
+*.onnx
+*.torchscript
+*.pt

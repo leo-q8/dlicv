@@ -1,16 +1,53 @@
-from typing import Sequence
+from typing import Sequence, Dict
 
-import numpy as np
-try:
-    import pycuda.autoprimaryctx
-except ModuleNotFoundError:
-    import pycuda.autoinit
-import pycuda.driver as cuda
 import tensorrt as trt
+import torch
+from torch import Tensor
 
-from backend import Backend
-from utils.timer import TimeCounter
-from ..base.base_backend import BackendIOSpec, Backend_IOType, BaseBackend
+from dlcv.utils import Backend
+from dlcv.utils.timer import TimeCounter
+from ..base.base_backend import BackendIOSpec, BaseBackend
+from .torch_allocator import TorchAllocator
+
+
+def torch_dtype_from_trt(dtype: trt.DataType) -> torch.dtype:
+    """Convert pytorch dtype to TensorRT dtype.
+
+    Args:
+        dtype (str.DataType): The data type in tensorrt.
+
+    Returns:
+        torch.dtype: The corresponding data type in torch.
+    """
+
+    if dtype == trt.bool:
+        return torch.bool
+    elif dtype == trt.int8:
+        return torch.int8
+    elif dtype == trt.int32:
+        return torch.int32
+    elif dtype == trt.float16:
+        return torch.float16
+    elif dtype == trt.float32:
+        return torch.float32
+    else:
+        raise TypeError(f'{dtype} is not supported by torch')
+
+        
+def torch_device_from_trt(device: trt.TensorLocation):
+    """Convert pytorch device to TensorRT device.
+
+    Args:
+        device (trt.TensorLocation): The device in tensorrt.
+    Returns:
+        torch.device: The corresponding device in torch.
+    """
+    if device == trt.TensorLocation.DEVICE:
+        return torch.device('cuda')
+    elif device == trt.TensorLocation.HOST:
+        return torch.device('cpu')
+    else:
+        return TypeError(f'{device} is not supported by torch')
 
 
 class TRTBackend(BaseBackend):
@@ -32,63 +69,45 @@ class TRTBackend(BaseBackend):
         >>> print(outputs)
     """
 
-    def __init__(self, engine_file: str):
-        self._dynamic=False
-        self._input_allocs, self._output_allocs = [], [] 
+    def __init__(self, engine_file: str, device_id: int = 0):
+        self.torch_device = torch.device('cuda', device_id)
+        self.allocator = TorchAllocator(device_id)
         with trt.Logger() as logger, trt.Runtime(logger) as runtime:
             with open(engine_file, mode='rb') as f:
                 engine_bytes = f.read()
             trt.init_libnvinfer_plugins(logger, namespace='')
             self.engine = runtime.deserialize_cuda_engine(engine_bytes)
         self.context = self.engine.create_execution_context()
+
+        if hasattr(self.context, 'temporary_allocator'):
+            self.context.temporary_allocator = self.allocator
+
         self.__load_io_names()
         
         input_specs, output_specs = [], []
-        input_allocs, output_allocs = {}, {}
         profile_id = 0
         for input_name in self._input_names:
             index = self.engine.get_binding_index(input_name)
-            dtype = trt.nptype(self.engine.get_binding_dtype(input_name)) 
-            dtype = np.dtype(dtype)
-            shape = tuple(self.engine.get_binding_shape(input_name))
+            dtype = torch_dtype_from_trt(
+                self.engine.get_binding_dtype(input_name)) 
+            shape = tuple(self.context.get_binding_shape(index))
             if -1 in shape:
-                self._dynamic = True
                 profile_shape = self.engine.get_profile_shape(profile_id,
                                                               input_name)
                 shape = {'min': profile_shape[0], 
                          'opt': profile_shape[1],
                          'max': profile_shape[2]}
-                # Set input binding shape for geting output max shape
-                self.context.set_binding_shape(index, shape['max'])
-                alloc = cuda.mem_alloc(
-                    trt.volume(shape['max']) * dtype.itemsize
-                ) 
-            else:
-                alloc = cuda.mem_alloc(trt.volume(shape)*dtype.itemsize) 
             input_specs.append(
-                BackendIOSpec(input_name, index, shape, dtype)
-            )
-            input_allocs[index] = alloc
+                BackendIOSpec(input_name, index, shape, dtype))
 
         for output_name in self._output_names:
             index = self.engine.get_binding_index(output_name)
-            dtype = trt.nptype(self.engine.get_binding_dtype(output_name)) 
-            dtype = np.dtype(dtype)
-            shape = tuple(self.engine.get_binding_shape(output_name))
-            if self._dynamic:
-                binding_shape = self.context.get_binding_shape(index)
-                alloc = cuda.mem_alloc(
-                    trt.volume(binding_shape) * dtype.itemsize
-                ) 
-            else:
-                alloc = cuda.mem_alloc(trt.volume(shape) * dtype.itemsize) 
+            dtype = torch_dtype_from_trt(
+                self.engine.get_binding_dtype(output_name)) 
+            shape = tuple(self.context.get_binding_shape(index))
             output_specs.append(
-                BackendIOSpec(output_name, index, shape, dtype)
-            )
-            output_allocs[index] = alloc
+                BackendIOSpec(output_name, index, shape, dtype))
         super().__init__([engine_file], input_specs, output_specs)
-        self._input_allocs = [input_allocs[k] for k in sorted(input_allocs)]
-        self._output_allocs = [output_allocs[k] for k in sorted(output_allocs)]
     
     def __load_io_names(self):
         """Load input/output names from engine."""
@@ -100,50 +119,50 @@ class TRTBackend(BaseBackend):
                 output_names.append(binding)
         self._input_names, self._output_names = input_names, output_names
 
-    def _infer(self, inputs: Sequence[np.ndarray]) -> Backend_IOType:
+    def _infer(self, inputs: Sequence[Tensor]) -> Dict[str, Tensor]:
         """Do inference.
         Args:
-            inputs (Dict[str, np.ndarray]): The input name and tensor pairs.
+            inputs (Sequence[np.ndarray]): The input tensor sequence.
         Return:
             Dict[str, np.ndarray]: The output name and tensor pairs.
         """
         # Make self the active context, pushing it on top of the context stack.
-        for input_spec, alloc in zip(self._input_specs, self._input_allocs):
-            name, index, shape, dtype = input_spec
-            input_array = inputs[index]
-            assert input_array.dtype == dtype, \
-                f'Require {dtype} for {name}, but get {input_array.dtype}.'
-            if self._dynamic and isinstance(shape, dict): 
-                # check if input shape is valid
-                assert len(input_array.shape) == len(shape['min']), \
-                    'Input dim is different from engine profile.'
-                for s_min, s_input, s_max in zip(shape['min'], 
-                                                 input_array.shape, 
-                                                 shape['max']):
-                    assert s_min <= s_input <= s_max, \
-                        'Input shape should be between ' \
-                        + f"{shape['min']} and {shape['max']}" \
-                        + f' but get {tuple(input_array.shape)}.'
-                self.context.set_binding_shape(index, input_array.shape)
-            else:
-                assert shape == tuple(input_array.shape), \
-                    f'Input shape shoule equal to {shape} ' \
-                    + f'but get {input_array.shape}.'
-            # Copy input image to host buffer
-            cuda.memcpy_htod(alloc, input_array)
+        bindings = [None] * (len(self._input_names) + len(self._output_names))
+        profile_id = 0
+        for input_spec, input_tensor in zip(self._input_specs, inputs):
+            name, index, _, dtype = input_spec
+            profile = self.engine.get_profile_shape(profile_id, name)
+            # check if input shape is valid
+            assert input_tensor.ndim == len(
+                profile[0]), 'Input dim is different from engine profile.'
+            for s_min, s_input, s_max in zip(profile[0], input_tensor.shape, 
+                                             profile[2]):
+                assert s_min <= s_input <= s_max, \
+                    'Input shape should be between ' \
+                    + f"{profile[0]} and {profile[2]}" \
+                    + f' but get {tuple(input_tensor.shape)}.'
 
-        bindings = [int(alloc) for alloc in self._input_allocs + 
-                                            self._output_allocs]
-        # Run inference.
-        self.__trt_execute(bindings=bindings)
+            if input_tensor.dtype == torch.long:
+                input_tensor = input_tensor.int()
+            input_tensor = input_tensor.contiguous()
+            assert input_tensor.dtype == dtype, \
+                f'Require {dtype} for `{name}`, but get {input_tensor.dtype}.'
+            input_tensor = input_tensor.to(self.torch_device)
+            self.context.set_binding_shape(index, tuple(input_tensor.shape))
+            bindings[index] = input_tensor.contiguous().data_ptr()
+            
         # Collect output array
         outputs = {}
-        for output_spec, alloc in zip(self._output_specs, self._output_allocs):
+        for output_spec in self._output_specs:
             name, index, _, dtype = output_spec
-            binding_shape = self.context.get_binding_shape(index)
-            output_array = np.empty(binding_shape, dtype=dtype)
-            cuda.memcpy_dtoh(output_array, alloc)
-            outputs[name] = output_array
+            device = torch_device_from_trt(self.engine.get_location(index))
+            shape = tuple(self.context.get_binding_shape(index))
+            output = torch.empty(size=shape, dtype=dtype, device=device)
+            outputs[name] = output
+            bindings[index] = output.data_ptr()
+
+        # Run inference.
+        self.__trt_execute(bindings=bindings)
 
         return outputs
 
@@ -153,11 +172,5 @@ class TRTBackend(BaseBackend):
         Args:
             bindings (list[int]): A list of integer binding the input/output.
         """
-        self.context.execute_v2(bindings)
-    
-    def destroy(self):
-        for alloc in self._input_allocs + self._output_allocs:
-            alloc.free()
-        
-    def __del__(self):
-        self.destroy()
+        self.context.execute_async_v2(bindings,
+                                      torch.cuda.current_stream().cuda_stream)

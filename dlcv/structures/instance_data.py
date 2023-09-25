@@ -3,11 +3,26 @@ from collections.abc import Sized
 from typing import Any, List, Union
 
 import numpy as np
+import torch
 
+from dlcv.utils.device import get_device
 from .base_data_element import BaseDataElement
 
+BoolTypeTensor: Union[Any]
+LongTypeTensor: Union[Any]
 
-IndexType: Union[Any] = Union[str, slice, int, list, np.ndarray]
+if get_device() == 'npu':
+    BoolTypeTensor = Union[torch.BoolTensor, torch.npu.BoolTensor]
+    LongTypeTensor = Union[torch.LongTensor, torch.npu.LongTensor]
+elif get_device() == 'mlu':
+    BoolTypeTensor = Union[torch.BoolTensor, torch.mlu.BoolTensor]
+    LongTypeTensor = Union[torch.LongTensor, torch.mlu.LongTensor]
+else:
+    BoolTypeTensor = Union[torch.BoolTensor, torch.cuda.BoolTensor]
+    LongTypeTensor = Union[torch.LongTensor, torch.cuda.LongTensor]
+
+IndexType: Union[Any] = Union[str, slice, int, list, LongTypeTensor,
+                              BoolTypeTensor, np.ndarray]
 
 
 # Modified from
@@ -156,6 +171,13 @@ class InstanceData(BaseDataElement):
         assert isinstance(item, IndexType.__args__)
         if isinstance(item, list):
             item = np.array(item)
+        if isinstance(item, np.ndarray):
+            # The default int type of numpy is platform dependent, int32 for
+            # windows and int64 for linux. `torch.Tensor` requires the index
+            # should be int64, therefore we simply convert it to int64 here.
+            # More details in https://github.com/numpy/numpy/issues/9464
+            item = item.astype(np.int64) if item.dtype == np.int32 else item
+            item = torch.from_numpy(item)
 
         if isinstance(item, str):
             return getattr(self, item)
@@ -168,12 +190,12 @@ class InstanceData(BaseDataElement):
                 item = slice(item, None, len(self))
 
         new_data = self.__class__(metainfo=self.metainfo)
-        if isinstance(item, np.ndarray):
-            assert len(item.shape) == 1, 'Only support to get the' \
+        if isinstance(item, torch.Tensor):
+            assert item.ndim == 1, 'Only support to get the' \
                                     ' values along the first dimension.'
-            if item.dtype == bool:
+            if isinstance(item, BoolTypeTensor.__args__):
                 assert len(item) == len(self), 'The shape of the ' \
-                                               'bool input array ' \
+                                               'input(BoolTensor) ' \
                                                f'{len(item)} ' \
                                                'does not match the shape ' \
                                                'of the indexed tensor ' \
@@ -182,16 +204,19 @@ class InstanceData(BaseDataElement):
                                                'first dimension.'
 
             for k, v in self.items():
-                if isinstance(v, np.ndarray):
+                if isinstance(v, torch.Tensor):
                     new_data[k] = v[item]
+                elif isinstance(v, np.ndarray):
+                    new_data[k] = v[item.cpu().numpy()]
                 elif isinstance(
                         v, (str, list, tuple)) or (hasattr(v, '__getitem__')
                                                    and hasattr(v, 'cat')):
                     # convert to indexes from BoolTensor
-                    if item.dtype == bool:
-                        indexes = np.nonzero(item)[0].tolist()
+                    if isinstance(item, BoolTypeTensor.__args__):
+                        indexes = torch.nonzero(item).view(
+                            -1).cpu().numpy().tolist()
                     else:
-                        indexes = item.tolist()
+                        indexes = item.cpu().numpy().tolist()
                     slice_list = []
                     if indexes:
                         for index in indexes:
@@ -257,7 +282,9 @@ class InstanceData(BaseDataElement):
         for k in instances_list[0].keys():
             values = [results[k] for results in instances_list]
             v0 = values[0]
-            if isinstance(v0, np.ndarray):
+            if isinstance(v0, torch.Tensor):
+                new_values = torch.cat(values, dim=0)
+            elif isinstance(v0, np.ndarray):
                 new_values = np.concatenate(values, axis=0)
             elif isinstance(v0, (str, list, tuple)):
                 new_values = v0[:]

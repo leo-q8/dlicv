@@ -2,6 +2,7 @@ import warnings
 from typing import List, Sequence, Union
 
 import numpy as np
+import torch
 
 from .base_data_element import BaseDataElement
 
@@ -41,7 +42,7 @@ class PixelData(BaseDataElement):
         ...     pixel_data.map2 = torch.randint(0, 255, (1, 3, 20, 40))
     """
 
-    def __setattr__(self, name: str, value: np.ndarray):
+    def __setattr__(self, name: str, value: Union[torch.Tensor, np.ndarray]):
         """Set attributes of ``PixelData``.
 
         If the dimension of value is 2 and its shape meet the demand, it
@@ -61,8 +62,9 @@ class PixelData(BaseDataElement):
                                      'private attribute, which is immutable.')
 
         else:
-            assert isinstance(value, np.ndarray), \
-                f'Can not set {type(value)}, only support {np.ndarray}'
+            assert isinstance(value, (torch.Tensor, np.ndarray)), \
+                f'Can not set {type(value)}, only support' \
+                f' {(torch.Tensor, np.ndarray)}'
 
             if self.shape:
                 assert tuple(value.shape[-2:]) == self.shape, (

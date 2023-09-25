@@ -1,0 +1,6 @@
+aenum
+matplotlib
+numpy
+opencv-python
+prettytable
+terminaltables

@@ -1,11 +1,14 @@
 import time
 import warnings
 from contextlib import contextmanager
+from logging import Logger
 from typing import Optional
 
 import numpy as np
+import torch
 
 from dlcv.utils.logging import get_logger
+
 
 class TimeCounter:
     """A tool for counting inference time of backends."""
@@ -19,6 +22,7 @@ class TimeCounter:
                    log_interval: int = 1,
                    with_sync: bool = False):
         """Proceed time counting.
+
         Args:
             name (str): Name of this timer.
             warmup (int): The warm up steps, default 1.
@@ -55,11 +59,15 @@ class TimeCounter:
                 cls.names[name]['count'] = count
 
                 if enable:
+                    if with_sync and torch.cuda.is_available():
+                        torch.cuda.synchronize()
                     start_time = time.perf_counter()
 
                 result = func(*args, **kwargs)
 
                 if enable:
+                    if with_sync and torch.cuda.is_available():
+                        torch.cuda.synchronize()
                     elapsed = (time.perf_counter() - start_time) / batch_size
 
                 if enable and count > warmup:
@@ -87,9 +95,11 @@ class TimeCounter:
                  log_interval: int = 1,
                  with_sync: bool = False,
                  file: Optional[str] = None,
+                 logger: Optional[Logger] = None,
                  batch_size: int = 1,
                  **kwargs):
         """Activate the time counter.
+
         Args:
             func_name (str): Specify which function to activate. If not
                 specified, all registered function will be activated.
@@ -99,9 +109,12 @@ class TimeCounter:
                 default False.
             file (str | None): The file to save output messages. The default
                 is `None`.
+            logger (Logger): The logger for the timer. Default to None.
+            batch_size (int): The batch size. Default to 1.
         """
         assert warmup >= 1
-        logger = get_logger('test', log_file=file)
+        if logger is None:
+            logger = get_logger('test', log_file=file)
         cls.logger = logger
         if func_name is not None:
             warnings.warn('func_name must be globally unique if you call '
@@ -130,6 +143,7 @@ class TimeCounter:
     @classmethod
     def print_stats(cls, name: str):
         """print statistics results of timer.
+
         Args:
             name (str): The name registered with `count_time`.
         """

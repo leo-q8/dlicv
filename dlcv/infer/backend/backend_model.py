@@ -2,11 +2,11 @@ import logging
 from typing import Union, Optional, Sequence, Callable
 
 from pathlib import Path
-import numpy as np
+from torch import Tensor
 
-from . import Backend
-from .base import get_backend_manager
+from dlcv.utils import Backend
 from dlcv.utils.logging import get_logger
+from .base import get_backend_manager
 
 format_backends = {
     'engine': Backend.TENSORRT,
@@ -14,6 +14,7 @@ format_backends = {
     'om': Backend.ASCEND,
     'onnx': Backend.ONNXRUNTIME,
     'torchscript': Backend.TORCHSCRIPT,
+    'pt': Backend.TORCHSCRIPT,
 }
 
 
@@ -31,6 +32,7 @@ class BackendModel:
                  postprocessor: Optional[Callable] = None,
                  input_names: Optional[Sequence[str]] = None,
                  output_names: Optional[Sequence[str]] = None,
+                 force_cast: bool = False,
                  **kwargs):
         """The default methods to build backend wrappers.
         Args:
@@ -75,34 +77,29 @@ class BackendModel:
                                                  device_id, input_names, 
                                                  output_names, **kwargs)
         self.backend_mgr = backend_mgr
-        if preprocessor is not None:
-            self.preprocessor = preprocessor
-        if postprocessor is not None:
-            self.postprocessor = postprocessor
+        self.preprocessor = preprocessor
+        self.postprocessor = postprocessor
+        self.force_cast = force_cast
         backend_file = backend_files if isinstance(backend_files, str) else \
                                          backend_files[0]
-        self._name = Path(backend_file).stem
+        self._name = Path(backend_file).name
         self._no_more_warning = False
 
     def destroy(self):
         if hasattr(self, 'backend') and hasattr(self.backend, 'destroy'):
             self.backend.destroy()
     
-    def __call__(self, img: np.ndarray, 
+    def __call__(self, inputs: Union[Tensor, Sequence[Tensor]], 
                  preprocessor_kargs : dict = dict(),
                  postprocessor_kargs : dict = dict()):
-        pre_inputs = img if not self.with_preprocessor else \
-            self.preprocessor(img, **preprocessor_kargs)
-        if isinstance(pre_inputs, np.ndarray): 
+        pre_inputs = inputs if not self.with_preprocessor else \
+            self.preprocessor(inputs, **preprocessor_kargs)
+        if isinstance(pre_inputs, Tensor): 
             pre_inputs = [pre_inputs]
-        if self.backend.input_specs is not None:
-            assert len(pre_inputs) == len(self.backend.input_specs), \
-                f'{self._name} requires {len(self.backend.input_specs)}, ' \
-                f'but got {len(pre_inputs)}'
+        if self.force_cast and self.backend.input_specs is not None:
             inputs = []
             for input, input_spec in zip(pre_inputs, self.backend.input_specs):
                 if input.dtype is not None and input.dtype != input_spec.dtype:
-                    input = input.astype(input_spec.dtype)
                     if not self._no_more_warning:
                         self.logger.warning(
                             f"Backend model `{self._name}` required "
@@ -110,6 +107,7 @@ class BackendModel:
                             f"`{input_spec.name}`. Cast {input.dtype} input "
                             f"to {input_spec.dtype}")
                         self._no_more_warning = True
+                    input = input.to(input_spec.dtype)
                 inputs.append(input)
         else:
             inputs = pre_inputs

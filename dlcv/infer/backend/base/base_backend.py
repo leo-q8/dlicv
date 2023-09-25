@@ -2,9 +2,9 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from typing import Dict, Union, Sequence, Optional
 
-import numpy as np
+from torch import Tensor
 
-Backend_IOType = Union[np.ndarray, Sequence[np.ndarray], Dict[str, np.ndarray]]
+Backend_IOType = Union[Tensor, Sequence[Tensor], Dict[str, Tensor]]
 
 #TODO a cython bug, do not suport NamedTuple object cythonized
 # class BackendIOSpec(NamedTuple):
@@ -54,16 +54,22 @@ class BaseBackend(metaclass=ABCMeta):
         """
         return 1
 
-    def infer(self, inputs: Backend_IOType) -> Backend_IOType:
+    def infer(self, *inputs: Backend_IOType) -> Backend_IOType:
+        if isinstance(inputs[0], (dict, tuple, list)):
+            assert len(inputs) == 1
+            inputs = inputs[0]
         if type(inputs) == dict:
-            assert self._input_specs is not None and len(self._input_specs)
+            assert self._input_specs is not None
             inputs = [inputs[i.name] for i in self._input_specs]
-        elif isinstance(inputs, np.ndarray):
+        elif isinstance(inputs, Tensor):
             inputs = [inputs]
+        if self._input_specs is not None:
+            assert len(self._input_specs) == len(inputs)
+         
         return self._infer(inputs)
         
     @abstractmethod
-    def _infer(self, inputs: Sequence[np.ndarray]) -> Backend_IOType:
+    def _infer(self, inputs: Sequence[Tensor]) -> Backend_IOType:
         """Run forward inference.
         Args:
             inputs (Sequence[np.ndarray]): NDarray Sequence of model inputs.
@@ -72,8 +78,8 @@ class BaseBackend(metaclass=ABCMeta):
         """
         pass
 
-    def output_to_sequence(
-            self, backend_outputs: Backend_IOType) -> Backend_IOType:
+    def output_to_sequence( self, backend_outputs: Backend_IOType
+        ) -> Union[Tensor, Sequence[Tensor]]:
         """Convert the output dict of forward() to a tensor list.
         Args:
             output_dict (Dict[str, np.ndarray]): Key-value pairs of model
@@ -82,7 +88,7 @@ class BaseBackend(metaclass=ABCMeta):
             List[np.ndarray]: An output value list whose order is determined
                 by the ouput_names list.
         """
-        if isinstance(backend_outputs, np.ndarray):
+        if isinstance(backend_outputs, Tensor):
             return backend_outputs
         elif isinstance(backend_outputs, dict):
             assert self._output_specs is not None and len(self._output_specs)

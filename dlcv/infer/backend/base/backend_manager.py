@@ -1,6 +1,6 @@
 import importlib
 from abc import ABCMeta
-from typing import Any, Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from .base_backend import BaseBackend
 
@@ -84,15 +84,15 @@ class BackendManagerRegistry:
             enum_name (Optional[str], optional): enum name of the backend.
                 if not given, the upper case of name would be used.
         """
-        from utils.logging import get_logger
-        logger = get_logger('backend')
+        from dlcv.utils.logging import get_root_logger
+        logger = get_root_logger()
 
         if enum_name is None:
             enum_name = name.upper()
 
         def wrap_manager(cls):
 
-            from backend import Backend
+            from dlcv.utils import Backend
 
             if not hasattr(Backend, enum_name):
                 from aenum import extend_enum
@@ -120,10 +120,7 @@ class BackendManagerRegistry:
             BaseBackendManager: backend manager of the given backend.
         """
         # try import backend if backend is in `backend`
-        try:
-            importlib.import_module('backend.' + name)
-        except Exception:
-            pass
+        importlib.import_module('dlcv.infer.backend.' + name)
         return self._module_dict.get(name, None)
 
 

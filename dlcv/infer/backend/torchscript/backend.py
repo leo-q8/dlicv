@@ -1,11 +1,10 @@
 from typing import Optional, Sequence
 
-import numpy as np
 import torch
 import torchvision # necessary for load `torchvison.ops.nsm`
 
-from backend import Backend
-from utils.timer import TimeCounter
+from dlcv.utils import Backend
+from dlcv.utils.timer import TimeCounter
 from ..base import BaseBackend, BackendIOSpec, Backend_IOType
 
 
@@ -42,9 +41,10 @@ class TorchScriptBackend(BaseBackend):
             self.device = f'{device_type}:{device_id}'
         else:
             self.device = device_type
-        self.ts_model = torch.jit.load(model_file, map_location=self.device)
-        assert isinstance(self.ts_model, torch.jit.RecursiveScriptModule
+        ts_model = torch.jit.load(model_file, map_location='cpu')
+        assert isinstance(ts_model, torch.jit.RecursiveScriptModule
                           ), 'failed to load torchscript model.'
+        self.ts_model = ts_model.to(self.device)
         if input_names is not None:
             input_specs = []
             for i, name in enumerate(input_names):
@@ -60,25 +60,21 @@ class TorchScriptBackend(BaseBackend):
             output_specs = None
         super().__init__([model_file], input_specs, output_specs)
 
-    def _infer(self, inputs: Sequence[np.ndarray]) -> Backend_IOType:
+    def _infer(self, inputs: Sequence[torch.Tensor]) -> Backend_IOType:
         """Do inference.
         Args:
             inputs (Dict[str, np.ndarray]): The input name and tensor pairs.
         Return:
             Dict[str, np.ndarray]: The output name and tensor pairs.
         """
-        torch_inputs = [torch.from_numpy(x).to(self.device) for x in inputs]
+        torch_inputs = [x.to(self.device) for x in inputs]
         outputs = self.__torchscript_execute(torch_inputs)
         if self._output_specs is not None:
-            assert len(outputs) == len(self._output_specs)
             if isinstance(outputs, torch.Tensor):
                 outputs = [outputs]
-            outputs = {i.name: output.cpu().numpy()
+            assert len(outputs) == len(self._output_specs)
+            outputs = {i.name: output
                        for i, output in zip(self._output_specs, outputs)}
-        elif isinstance(outputs, torch.Tensor):
-            outputs = outputs.cpu().numpy()
-        else:
-            outputs = [output.cpu().numpy() for output in outputs]
         return outputs
 
     @torch.no_grad()

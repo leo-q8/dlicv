@@ -2,24 +2,30 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, List, Callable, Union, Sequence
 
 import numpy as np
+import torch
+import torch.nn as nn
 
 from dlcv.transforms import Compose
 from dlcv.structures import BaseDataElement
 from ..backend import BackendModel
 
-InputType = np.ndarray
+InputType = Union[np.ndarray, torch.Tensor]
 InputsType = Union[InputType, Sequence[InputType]]
+ModelType = Union[dict, nn.Module, BackendModel]
 
 
 class BasePredictor(metaclass=ABCMeta):
     def __init__(self, 
-                 backend_model: Union[dict, BackendModel],
-                 pipeline: Sequence[Callable]):
+                 backend_model: ModelType,
+                 pipeline: Union[Callable, Sequence[Callable]]):
         if isinstance(backend_model, dict):
             backend_model = BackendModel(**backend_model)
         self.backend_model = backend_model
-        self.pipeline = Compose(pipeline)
+        if isinstance(pipeline, (list, dict)):
+            pipeline = Compose(pipeline)
+        self.pipeline = pipeline
 
+    @torch.no_grad()
     def __call__(self, 
                  inputs: InputsType, 
                  preporcess_kwargs: dict = dict(),
@@ -37,11 +43,15 @@ class BasePredictor(metaclass=ABCMeta):
     def collect_batch(self, data_batch: Sequence[dict]) -> dict:
         data = {key: [d[key] for d in data_batch]
                 for key in data_batch[0]}
-        data['inputs'] = np.stack(data['inputs'])
+        data['inputs'] = torch.stack(data['inputs'])
         return data
     
     def preprocess(self, inputs: InputsType, **kwargs) -> dict:
-        data_batch = [self.pipeline(input) for input in inputs] 
+        if isinstance(inputs, np.ndarray):
+            inputs = [inputs]
+        elif isinstance(inputs, torch.Tensor):
+            assert inputs.ndim == 4
+        data_batch = [self.pipeline({'inputs': input}) for input in inputs] 
         return self.collect_batch(data_batch, **kwargs)
 
     @abstractmethod

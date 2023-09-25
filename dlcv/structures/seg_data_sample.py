@@ -1,4 +1,5 @@
-from . import BaseDataElement, PixelData
+from .base_data_element import BaseDataElement
+from .pixel_data import PixelData
 
 
 class SegDataSample(BaseDataElement):
