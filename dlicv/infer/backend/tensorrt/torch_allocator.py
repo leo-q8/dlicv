@@ -1,7 +1,7 @@
 import tensorrt as trt
 import torch
 
-from dlcv.utils.logging import get_root_logger
+from dlicv.utils.logging import get_root_logger
 
 
 class TorchAllocator(trt.IGpuAllocator):

@@ -5,8 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from dlcv.transforms import Compose
-from dlcv.structures import BaseDataElement
+from dlicv.transforms import Compose
+from dlicv.structures import BaseDataElement
 from ..backend import BackendModel
 
 InputType = Union[np.ndarray, torch.Tensor]

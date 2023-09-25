@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import torch
 
-from dlcv.ops import bitmap_to_polygon
+from dlicv.ops import bitmap_to_polygon
 from .palette import _get_adaptive_scales, get_palette, jitter_color
 from .utils import tensor2ndarray
 from . import Visualizer

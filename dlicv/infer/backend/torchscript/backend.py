@@ -3,8 +3,8 @@ from typing import Optional, Sequence
 import torch
 import torchvision # necessary for load `torchvison.ops.nsm`
 
-from dlcv.utils import Backend
-from dlcv.utils.timer import TimeCounter
+from dlicv.utils import Backend
+from dlicv.utils.timer import TimeCounter
 from ..base import BaseBackend, BackendIOSpec, Backend_IOType
 
 

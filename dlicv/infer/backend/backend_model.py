@@ -4,8 +4,8 @@ from typing import Union, Optional, Sequence, Callable
 from pathlib import Path
 from torch import Tensor
 
-from dlcv.utils import Backend
-from dlcv.utils.logging import get_logger
+from dlicv.utils import Backend
+from dlicv.utils.logging import get_logger
 from .base import get_backend_manager
 
 format_backends = {

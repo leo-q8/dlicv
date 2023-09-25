@@ -3,8 +3,8 @@ from typing import Sequence
 from ais_bench.infer.interface import InferSession
 import numpy as np
 
-from dlcv.utils import Backend
-from dlcv.utils.timer import TimeCounter
+from dlicv.utils import Backend
+from dlicv.utils.timer import TimeCounter
 from ..base import BaseBackend, BackendIOSpec, Backend_IOType
 
 _from_acl_data_type = {

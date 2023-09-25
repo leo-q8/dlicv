@@ -3,8 +3,8 @@ from typing import Any, List, Callable, Optional, Sequence, Tuple
 
 from torch import Tensor
 
-from dlcv.structures import DetDataSample, InstanceData
-from dlcv.ops.boxes import batched_nms, box_wh
+from dlicv.structures import DetDataSample, InstanceData
+from dlicv.ops.boxes import batched_nms, box_wh
 from .base import BasePredictor, ModelType
 
 SampleList = List[DetDataSample]

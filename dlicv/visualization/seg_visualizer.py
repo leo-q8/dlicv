@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-from dlcv.structures import PixelData
+from dlicv.structures import PixelData
 from .palette import get_palette
 from .visualizer import Visualizer
 

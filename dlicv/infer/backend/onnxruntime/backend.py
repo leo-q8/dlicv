@@ -4,8 +4,8 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from dlcv.utils import Backend
-from dlcv.utils.timer import TimeCounter
+from dlicv.utils import Backend
+from dlicv.utils.timer import TimeCounter
 from ..base import BaseBackend, BackendIOSpec
 
 

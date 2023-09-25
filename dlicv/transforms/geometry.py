@@ -3,7 +3,7 @@ from typing import Optional, Union, Tuple
 
 import numpy as np
 
-from dlcv.ops.image import imresize, impad
+from dlicv.ops.image import imresize, impad
 from .base import BaseTransform
 
 

@@ -4,8 +4,8 @@ import tensorrt as trt
 import torch
 from torch import Tensor
 
-from dlcv.utils import Backend
-from dlcv.utils.timer import TimeCounter
+from dlicv.utils import Backend
+from dlicv.utils.timer import TimeCounter
 from ..base.base_backend import BackendIOSpec, BaseBackend
 from .torch_allocator import TorchAllocator
 

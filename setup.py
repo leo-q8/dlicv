@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 
-version_file = 'dlcv/version.py'
+version_file = 'dlicv/version.py'
 
 
 def get_version():
@@ -89,7 +89,7 @@ install_requires = parse_requirements()
 
 
 setup(
-    name='dlcv',
+    name='dlicv',
     version=get_version(),
     description='a Deep Learning inference tool box for Computer Vision',
     url='https://github.com/open-mmlab/mmengine',

@@ -3,7 +3,7 @@ from typing import List, Callable, Sequence, Optional
 from torch import Tensor
 import torch.nn.functional as F
 
-from dlcv.structures import SegDataSample, PixelData
+from dlicv.structures import SegDataSample, PixelData
 from .base import BasePredictor, ModelType
 
 SampleList = List[SegDataSample]

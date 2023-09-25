@@ -1,4 +1,4 @@
-from dlcv.structures import DetDataSample, SegDataSample
+from dlicv.structures import DetDataSample, SegDataSample
 from .base import BaseTransform
 
 

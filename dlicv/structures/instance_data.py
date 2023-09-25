@@ -5,7 +5,7 @@ from typing import Any, List, Union
 import numpy as np
 import torch
 
-from dlcv.utils.device import get_device
+from dlicv.utils.device import get_device
 from .base_data_element import BaseDataElement
 
 BoolTypeTensor: Union[Any]

@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 import torch
 
-from dlcv.utils.logging import get_logger
+from dlicv.utils.logging import get_logger
 
 
 class TimeCounter:
