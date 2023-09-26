@@ -29,10 +29,10 @@ class ImgToTensor(BaseTransform):
         # for more details
         if not img.flags.c_contiguous:
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
-            img = torch.from_numpy(img)
+            img = torch.from_numpy(img).to(self.device).to(self.dtype)
         else:
-            img = torch.from_numpy(img).permute(2, 0, 1).contiguous()
-        img = img.to(self.device).to(self.dtype)
+            img = torch.from_numpy(img).to(self.device).permute(
+                2, 0, 1).contiguous().to(self.dtype)
         results['img'] = img
         return results
     

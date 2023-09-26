@@ -53,7 +53,7 @@ class LoadImgFromTensor(BaseTransform):
             img = img.to(self.device)
         if self.to_float32:
             img = img.to(torch.float32)
-        size = tuple(img.shape[:2])
+        size = tuple(img.shape[-2:])
         results['img'] = img
         results['img_shape'] = size
         results['ori_shape'] = size

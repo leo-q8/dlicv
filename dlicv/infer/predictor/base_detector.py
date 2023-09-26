@@ -54,7 +54,7 @@ class BaseDetector(BasePredictor, metaclass=ABCMeta):
         scale_factor = img_meta.get('scale_factor')
         if scale_factor is not None:
             scale_factor = [1 / s for s in scale_factor]
-            bboxes /= bboxes.new_tensor(scale_factor * 2)
+            bboxes *= bboxes.new_tensor(scale_factor * 2)
         
         # filter samll size bboxes
         if self.min_box_size >= 0:

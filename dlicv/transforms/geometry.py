@@ -3,7 +3,7 @@ from typing import Optional, Union, Tuple
 
 import numpy as np
 
-from dlicv.ops.image import imresize, impad
+from dlicv.ops.image import imresize, impad, get_image_shape
 from .base import BaseTransform
 
 
@@ -20,20 +20,12 @@ class Resize(BaseTransform):
         
     def transform(self, results: dict) -> dict:
         img = results['img']
-        if isinstance(img, np.ndarray):
-            h, w = img.shape[:2]
-            img = imresize(img, 
-                           self.size,
-                           self.keep_ratio,
-                           self.interpolation)
-            new_h, new_w = img.shape[:2]
-        else:
-            h, w = img.shape[-2:]
-            img = imresize(img, 
-                           self.size,
-                           self.keep_ratio,
-                           self.interpolation)
-            new_h, new_w = img.shape[-2:]
+        h, w = get_image_shape(img)
+        img = imresize(img, 
+                       self.size,
+                       self.keep_ratio,
+                       self.interpolation)
+        new_h, new_w = get_image_shape(img)
         results['img'] = img
         results['img_shape'] = (new_h, new_w)
         results['scale_factor'] = (new_w / w, new_h / h)
@@ -74,13 +66,9 @@ class Pad(BaseTransform):
                              self.to_square,
                              self.padding_mode,
                              return_padding=True)
-        
-        if isinstance(img, np.ndarray):
-            shape = img.shape[:2]
-        else:
-            shape = tuple(img.shape[-2:])
+        h, w = get_image_shape(img)
         results['img'] = img
-        results['img_shape'] = shape
+        results['img_shape'] = (h, w)
         results['padding'] = padding
 
         return results

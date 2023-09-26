@@ -50,7 +50,11 @@ class BasePredictor(metaclass=ABCMeta):
         if isinstance(inputs, np.ndarray):
             inputs = [inputs]
         elif isinstance(inputs, torch.Tensor):
-            assert inputs.ndim == 4
+            if inputs.ndim == 3:
+                inputs = [inputs]
+            else:
+                assert inputs.ndim == 4, 'Required 3-Dim(C, H, W) or ' \
+                    f'4-Dim(B, C, H, W) tensor image'
         data_batch = [self.pipeline({'inputs': input}) for input in inputs] 
         return self.collect_batch(data_batch, **kwargs)
 

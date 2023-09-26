@@ -38,6 +38,12 @@ torchvision_interp_codes = {
 }
 
 
+def get_image_shape(img: ImgType) -> List[int]:
+    if isinstance(img, torch.Tensor):
+        return list(img.shape[-2:])
+    return list(img.shape[:2])
+
+
 def _get_keep_ratio_size(target_size: Tuple[int, int], 
                          old_size: Tuple[int, int]) -> tuple:
     h, w = old_size
