@@ -67,12 +67,11 @@ class BaseDetector(BasePredictor, metaclass=ABCMeta):
 
         # do nms
         if self.nms_cfg is not None:
-            bboxes, keep_idxs = batched_nms(bboxes, scores, 
-                                            labels, **self.nms_cfg)
+            keep_idxs = batched_nms(bboxes, scores, labels, **self.nms_cfg)
             if self.max_det > -1:
-                bboxes = bboxes[:self.max_det]
                 keep_idxs = keep_idxs[:self.max_det]
-            scores = bboxes[:, -1]
+            bboxes = bboxes[keep_idxs]
+            scores = scores[keep_idxs]
             labels = labels[keep_idxs]
 
         # select topk
@@ -94,6 +93,7 @@ class BaseDetector(BasePredictor, metaclass=ABCMeta):
         parsed_preds = self._parse_preds(preds, batch_img_metas)
         for data_sample, cls_socres, bbox_preds, labels, img_meta in \
                 zip(batch_datasamples, *parsed_preds, batch_img_metas):
+
             bboxes, scores, labels = self.bbox_postprocess(
                 bbox_preds, cls_socres, labels, img_meta)
             results = InstanceData()

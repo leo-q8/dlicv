@@ -5,7 +5,7 @@ from pathlib import Path
 from torch import Tensor
 
 from dlicv.utils import Backend
-from dlicv.utils.logging import get_logger
+from dlicv.utils.logging import get_root_logger
 from .base import get_backend_manager
 
 format_backends = {
@@ -46,7 +46,7 @@ class BackendModel:
                 order. Defaults to `None` and the wrapper will load the output
                 names from the model.
         """
-        self.logger = get_logger('BackendModel') if logger is None else logger
+        self.logger = get_root_logger() if logger is None else logger
         if backend is None:
             if isinstance(backend_files, str):
                 file_format = backend_files.split('.')[-1]
@@ -102,7 +102,7 @@ class BackendModel:
                 if input.dtype is not None and input.dtype != input_spec.dtype:
                     if not self._no_more_warning:
                         self.logger.warning(
-                            f"Backend model `{self._name}` required "
+                            f"Backend model `{self._name}` requires "
                             f"{input_spec.dtype} for input "
                             f"`{input_spec.name}`. Cast {input.dtype} input "
                             f"to {input_spec.dtype}")

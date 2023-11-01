@@ -266,7 +266,7 @@ def imcrop(img: ImgType,
     patches = []
     clipped_boxes = clip_boxes(scaled_boxes, (h - 1, w - 1))
     for i in range(clipped_boxes.shape[0]):
-        x1, y1, x2, y2 = scaled_boxes[i, :]
+        x1, y1, x2, y2 = clipped_boxes[i, :]
         if pad_fill is None:
             patch = img_slice(img, x1, y1, x2, y2)
         else:

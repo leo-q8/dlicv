@@ -126,6 +126,5 @@ def batched_nms(boxes: Tensor,
         boxes_for_nms = boxes + offsets[:, None]
     keep_idxs = torchvision.ops.nms(boxes_for_nms, scores, iou_thres)
 
-    boxes = torch.cat(boxes[keep_idxs], scores[keep_idxs, None], -1)
     inds = inds[keep_idxs]
-    return boxes, inds
+    return inds

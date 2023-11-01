@@ -1,4 +1,4 @@
-from typing import List, Callable, Sequence, Optional
+from typing import List, Callable, Sequence
 
 from torch import Tensor
 import torch.nn.functional as F
@@ -43,6 +43,7 @@ class BaseSegmentor(BasePredictor):
         if C > 1: 
             seg_pred = seg_logits.argmax(dim=0, keepdim=True)
         else:
+            seg_logits = seg_logits.sigmoid()
             seg_pred = (seg_logits > self.binary_thres).to(seg_logits)
 
         return seg_logits, seg_pred
@@ -56,6 +57,7 @@ class BaseSegmentor(BasePredictor):
         ]
         for data_sample, seg_logit, img_meta in \
                 zip(batch_datasamples, seg_logits, batch_img_metas):
+
             seg_logit, seg_pred = self.mask_postprocess(
                 seg_logit, img_meta)
             data_sample.seg_logits = PixelData(**{'data': seg_logit})

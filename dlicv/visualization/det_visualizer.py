@@ -104,6 +104,8 @@ class DetVisualizer(Visualizer):
                        classes: Optional[List[str]] = None,
                        palette: Optional[Union[List[tuple], str]] = None,
                        kpt_thr: float = 0.3,
+                       show_label: bool = True,
+                       show_score: bool = True,
                        show_mask: bool = True,
                        show_edge: bool = True,
                        show_kpt = True,
@@ -150,27 +152,29 @@ class DetVisualizer(Visualizer):
             areas = tensor2ndarray(areas) 
             scales = _get_adaptive_scales(areas)
 
-            for i, (pos, label) in enumerate(zip(positions, labels)):
-                if 'label_names' in instances:
-                    label_text = instances.label_names[i]
-                else:
-                    label_text = classes[
-                        label] if classes is not None else f'class {label}'
-                if 'scores' in instances:
-                    score = round(float(instances.scores[i]) * 100, 1)
-                    label_text += f': {score}'
+            if show_label:
 
-                self.draw_texts(
-                    label_text,
-                    pos,
-                    colors=text_colors[i],
-                    font_sizes=int(13 * scales[i]),
-                    bboxes=[{
-                        'facecolor': 'black',
-                        'alpha': 0.8,
-                        'pad': 0.7,
-                        'edgecolor': 'none'
-                    }])
+                for i, (pos, label) in enumerate(zip(positions, labels)):
+                    if 'label_names' in instances:
+                        label_text = instances.label_names[i]
+                    else:
+                        label_text = classes[
+                            label] if classes is not None else f'class {label}'
+                    if show_score and 'scores' in instances:
+                        score = round(float(instances.scores[i]) * 100, 1)
+                        label_text += f': {score}'
+
+                    self.draw_texts(
+                        label_text,
+                        pos,
+                        colors=text_colors[i],
+                        font_sizes=int(13 * scales[i]),
+                        bboxes=[{
+                            'facecolor': 'black',
+                            'alpha': 0.8,
+                            'pad': 0.7,
+                            'edgecolor': 'none'
+                        }])
 
         if 'masks' in instances and (show_mask or show_edge):
             labels = instances.labels
