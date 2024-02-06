@@ -1,7 +1,7 @@
 from typing import Optional, Sequence
 
 import torch
-import torchvision # necessary for load `torchvison.ops.nsm`
+import torchvision # necessary for load `torchvison.ops`
 
 from dlicv.utils import Backend
 from dlicv.utils.timer import TimeCounter
@@ -9,22 +9,27 @@ from ..base import BaseBackend, BackendIOSpec, Backend_IOType
 
 
 class TorchScriptBackend(BaseBackend):
-    """Torchscript engine wrapper for inference.
+    """Torchscript backend for inference. This class is modified from 
+    `mmdeploy` https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/torchscript/wrapper.py
+
     Args:
-        model (torch.jit.RecursiveScriptModule): torchscript engine to wrap.
+        model_file (str): torchscript model file.
+        device_type (str): A string specifying device type. 
+                Defaults to 'cpu'.
+        device_id (int): A number specifying device id. Defaults to 0.
         input_names (Sequence[str] | None): Names of model inputs  in order.
-            Defaults to `None` and the wrapper will accept list or Tensor.
+            Defaults to `None` and the backend will accept list or Tensor.
         output_names (Sequence[str] | None): Names of model outputs  in order.
-            Defaults to `None` and the wrapper will return list or Tensor.
+            Defaults to `None` and the backend will return list or Tensor.
     Note:
         If the engine is converted from onnx model. The input_names and
         output_names should be the same as onnx model.
     Examples:
-        >>> from mmdeploy.backend.torchscript import TorchscriptWrapper
-        >>> engine_file = 'resnet.engine'
-        >>> model = TorchscriptWrapper(engine_file, input_names=['input'], \
+        >>> from dlicv.infer.backend.torchscript import TorchscriptWrapper
+        >>> model_file = 'resnet.pt'
+        >>> model = TorchscriptWrapper(model_file, input_names=['input'], \
         >>>    output_names=['output'])
-        >>> inputs = dict(input=torch.randn(1, 3, 224, 224))
+        >>> inputs = torch.randn(1, 3, 224, 224)
         >>> outputs = model(inputs)
         >>> print(outputs)
     """
@@ -48,14 +53,14 @@ class TorchScriptBackend(BaseBackend):
         if input_names is not None:
             input_specs = []
             for i, name in enumerate(input_names):
-                input_specs.append(BackendIOSpec(name, i, None, None))
+                input_specs.append(BackendIOSpec(i, name, None, None))
         else:
             input_specs = None
 
         if output_names is not None:
             output_specs = []
             for i, name in enumerate(output_names):
-                output_specs.append(BackendIOSpec(name, i, None, None))
+                output_specs.append(BackendIOSpec(i, name, None, None))
         else:
             output_specs = None
         super().__init__([model_file], input_specs, output_specs)
@@ -63,9 +68,9 @@ class TorchScriptBackend(BaseBackend):
     def _infer(self, inputs: Sequence[torch.Tensor]) -> Backend_IOType:
         """Do inference.
         Args:
-            inputs (Dict[str, np.ndarray]): The input name and tensor pairs.
+            inputs (Dict[str, torch.Tensor]): The input name and tensor pairs.
         Return:
-            Dict[str, np.ndarray]: The output name and tensor pairs.
+            BackendIOType: The output of torch model.
         """
         torch_inputs = [x.to(self.device) for x in inputs]
         outputs = self.__torchscript_execute(torch_inputs)

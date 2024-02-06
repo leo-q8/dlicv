@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -15,13 +15,9 @@ class DetVisualizer(Visualizer):
     """MMDetection Local Visualizer.
 
     Args:
-        name (str): Name of the instance. Defaults to 'visualizer'.
         image (np.ndarray, optional): the origin image to draw. The format
             should be RGB. Defaults to None.
-        vis_backends (list, optional): Visual backend config list.
             Defaults to None.
-        save_dir (str, optional): Save file dir for all storage backends.
-            If it is None, the backend storage will not save any data.
         bbox_color (str, tuple(int), optional): Color of bbox lines.
             The tuple of color should be in BGR order. Defaults to None.
         text_color (str, tuple(int), optional): Color of texts.
@@ -70,7 +66,6 @@ class DetVisualizer(Visualizer):
 
     def __init__(self,
                  image: Optional[np.ndarray] = None,
-                 save_dir: Optional[str] = None,
                  bbox_color: Optional[Union[str, Tuple[int]]] = None,
                  kpt_color: Optional[Union[str, Tuple[Tuple[int]]]] = 'red',
                  link_color: Optional[Union[str, Tuple[Tuple[int]]]] = None,
@@ -82,9 +77,7 @@ class DetVisualizer(Visualizer):
                  radius: Union[int, float] = 3,
                  show_keypoint_weight: bool = False,
                  alpha: float = 0.8) -> None:
-        super().__init__(
-            image=image,
-            save_dir=save_dir)
+        super().__init__(image=image)
         self.bbox_color = bbox_color
         self.kpt_color = kpt_color
         self.link_color = link_color

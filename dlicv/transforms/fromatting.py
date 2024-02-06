@@ -17,8 +17,8 @@ class PackDetInputs(BaseTransform):
         data_sample = DetDataSample()
         img_meta = {}
         for key in self.meta_keys:
-            assert key in results, f'`{key}` is not found in `results`, ' \
-                f'the valid keys are {list(results)}.'
+            assert key in results, f'`{key}` is not found in `results`. ' \
+                f'The valid keys are {self.meta_keys}.'
             img_meta[key] = results[key]
 
         data_sample.set_metainfo(img_meta)
@@ -43,12 +43,14 @@ class PackSegInputs(BaseTransform):
         if 'img' in results:
             img = results['img']
             packed_results['inputs'] = img
+        if 'ori_img' in results:
+            packed_results['ori_img'] = results['ori_img']
 
         data_sample = SegDataSample()
         img_meta = {}
         for key in self.meta_keys:
-            assert key in results, f'`{key}` is not found in `results`, ' \
-                f'the valid keys are {list(results)}.'
+            assert key in results, f'`{key}` is not found in `results`. ' \
+                f'The valid keys are {self.meta_keys}.'
             img_meta[key] = results[key]
 
         data_sample.set_metainfo(img_meta)

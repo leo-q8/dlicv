@@ -1,3 +1,5 @@
+# This file is modified from `mmdeploy`
+# https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/tensorrt/wrapper.py
 from typing import Sequence, Dict
 
 import tensorrt as trt
@@ -53,18 +55,14 @@ def torch_device_from_trt(device: trt.TensorLocation):
 class TRTBackend(BaseBackend):
     """TensorRT backbend for inference.
     Args:
-        engine (tensorrt.ICudaEngine): TensorRT engine to wrap.
-        output_names (Sequence[str] | None): Names of model outputs  in order.
-            Defaults to `None` and the wrapper will load the output names from
-            model.
-    Note:
-        If the engine is converted from onnx model. The input_names and
-        output_names should be the same as onnx model.
+        engine_file (str): TensorRT engine file.
+        device_id (int): A number specifying the cuda device id.
+
     Examples:
-        >>> from mmdeploy.backend.tensorrt import TRTWrapper
+        >>> from dlicv.infer.backend.tensorrt import TRTBackend
         >>> engine_file = 'resnet.engine'
-        >>> model = TRTWrapper(engine_file)
-        >>> inputs = dict(input=torch.randn(1, 3, 224, 224))
+        >>> model = TRTBackend(engine_file)
+        >>> inputs = torch.randn(1, 3, 224, 224).cuda()
         >>> outputs = model(inputs)
         >>> print(outputs)
     """
@@ -98,7 +96,7 @@ class TRTBackend(BaseBackend):
                          'opt': profile_shape[1],
                          'max': profile_shape[2]}
             input_specs.append(
-                BackendIOSpec(input_name, index, shape, dtype))
+                BackendIOSpec(index, input_name, shape, dtype))
 
         for output_name in self._output_names:
             index = self.engine.get_binding_index(output_name)
@@ -106,7 +104,7 @@ class TRTBackend(BaseBackend):
                 self.engine.get_binding_dtype(output_name)) 
             shape = tuple(self.context.get_binding_shape(index))
             output_specs.append(
-                BackendIOSpec(output_name, index, shape, dtype))
+                BackendIOSpec(index, output_name, shape, dtype))
         super().__init__([engine_file], input_specs, output_specs)
     
     def __load_io_names(self):
@@ -122,15 +120,16 @@ class TRTBackend(BaseBackend):
     def _infer(self, inputs: Sequence[Tensor]) -> Dict[str, Tensor]:
         """Do inference.
         Args:
-            inputs (Sequence[np.ndarray]): The input tensor sequence.
+            inputs (Sequence[torch.Tensor]): The input tensor sequence.
+
         Return:
-            Dict[str, np.ndarray]: The output name and tensor pairs.
+            Dict[str, torch.Tensor]: The output name and tensor pairs.
         """
         # Make self the active context, pushing it on top of the context stack.
         bindings = [None] * (len(self._input_names) + len(self._output_names))
         profile_id = 0
         for input_spec, input_tensor in zip(self._input_specs, inputs):
-            name, index, _, dtype = input_spec
+            index, name, _, dtype = input_spec
             profile = self.engine.get_profile_shape(profile_id, name)
             # check if input shape is valid
             assert input_tensor.ndim == len(
@@ -154,7 +153,7 @@ class TRTBackend(BaseBackend):
         # Collect output array
         outputs = {}
         for output_spec in self._output_specs:
-            name, index, _, dtype = output_spec
+            index, name, _, dtype = output_spec
             device = torch_device_from_trt(self.engine.get_location(index))
             shape = tuple(self.context.get_binding_shape(index))
             output = torch.empty(size=shape, dtype=dtype, device=device)

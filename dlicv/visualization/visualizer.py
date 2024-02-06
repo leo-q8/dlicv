@@ -16,10 +16,9 @@ from .utils import (check_type, check_type_and_length,
                     value2list, wait_continue)
 
 
-
 class Visualizer:
-    """MMEngine provides a Visualizer class that uses the ``Matplotlib``
-    library as the backend. It has the following functions:
+    """Visualizer class uses the ``Matplotlib`` library as the backend. 
+    It has the following functions:
 
     - Basic drawing methods
 
@@ -32,39 +31,26 @@ class Visualizer:
       - draw_binary_masks: draw single or multiple binary masks
       - draw_featmap: draw feature map
 
-    - Basic visualizer backend methods
-
-      - add_configs: write config to all vis storage backends
-      - add_graph: write model graph to all vis storage backends
-      - add_image: write image to all vis storage backends
-      - add_scalar: write scalar to all vis storage backends
-      - add_scalars: write scalars to all vis storage backends
-      - add_datasample: write datasample to all vis storage \
-         backends. The abstract drawing interface used by the user
-
     - Basic info methods
 
       - set_image: sets the original image data
       - get_image: get the image data in Numpy format after drawing
       - show: visualization
       - close: close all resources that have been opened
-      - get_backend: get the specified vis backend
 
-
+    This class is modified from `mmengine` 
+    https://github.com/open-mmlab/mmengine/blob/main/mmengine/visualization/visualizer.py#L186
     All the basic drawing methods support chain calls, which is convenient for
-    overlaydrawing and display. Each downstream algorithm library can inherit
-    ``Visualizer`` and implement the add_datasample logic. For example,
-    ``DetLocalVisualizer`` in MMDetection inherits from ``Visualizer``
+    overlaydrawing and display. Each downstream vision task can inherit
+    ``Visualizer`` and implement their own visual logic. For example, 
+    ``DetVisualizer`` in dlicv inherits from ``Visualizer``
     and implements functions, such as visual detection boxes, instance masks,
-    and semantic segmentation maps in the add_datasample interface.
+    and semantic segmentation maps in the draw_instance method.
 
     Args:
-        name (str): Name of the instance. Defaults to 'visualizer'.
         image (np.ndarray, optional): the origin image to draw. The format
             should be RGB. Defaults to None.
-        vis_backends (list, optional): Visual backend config list.
-            Defaults to None.
-        save_dir (str, optional): Save file dir for all storage backends.
+        save_dir (str, optional): Save file dir 
             If it is None, the backend storage will not save any data.
         fig_save_cfg (dict): Keyword parameters of figure for saving.
             Defaults to empty dict.
@@ -113,43 +99,14 @@ class Visualizer:
 
         >>> # chain calls
         >>> vis.draw_bboxes().draw_texts().draw_circle().draw_binary_masks()
-
-        >>> # Backend related methods
-        >>> vis = Visualizer(vis_backends=[dict(type='LocalVisBackend')],
-        >>>                                save_dir='temp_dir')
-        >>> cfg = Config(dict(a=1, b=dict(b1=[0, 1])))
-        >>> vis.add_config(cfg)
-        >>> image=np.random.randint(0, 256, size=(10, 10, 3)).astype(np.uint8)
-        >>> vis.add_image('image',image)
-        >>> vis.add_scaler('mAP', 0.6)
-        >>> vis.add_scalars({'loss': 0.1,'acc':0.8})
-
-        >>> # inherit
-        >>> class DetLocalVisualizer(Visualizer):
-        >>>      def add_datasample(self,
-        >>>                         name,
-        >>>                         image: np.ndarray,
-        >>>                         gt_sample:
-        >>>                             Optional['BaseDataElement'] = None,
-        >>>                         pred_sample:
-        >>>                             Optional['BaseDataElement'] = None,
-        >>>                         draw_gt: bool = True,
-        >>>                         draw_pred: bool = True,
-        >>>                         show: bool = False,
-        >>>                         wait_time: int = 0,
-        >>>                         step: int = 0) -> None:
-        >>>         pass
     """
 
     def __init__(
         self,
         image: Optional[np.ndarray] = None,
-        save_dir: Optional[str] = None,
         fig_save_cfg=dict(frameon=False),
         fig_show_cfg=dict(frameon=False)
     ) -> None:
-
-        self.save_dir = save_dir
         self.fig_save = None
         self.fig_save_cfg = fig_save_cfg
         self.fig_show_cfg = fig_show_cfg

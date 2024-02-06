@@ -1,11 +1,13 @@
 import tensorrt as trt
 import torch
 
-from dlicv.utils.logging import get_root_logger
+from dlicv.utils import get_root_logger
 
 
 class TorchAllocator(trt.IGpuAllocator):
-    """PyTorch Cuda Allocator Wrapper."""
+    """PyTorch Cuda Allocator Wrapper. This class is copied from `mmdepoly`
+    https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/tensorrt/torch_allocator.py
+    """
 
     def __init__(self, device_id: int = 0) -> None:
         super().__init__()

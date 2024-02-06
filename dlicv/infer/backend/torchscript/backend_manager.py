@@ -1,11 +1,14 @@
 import os.path as osp
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from ..base import BACKEND_MANAGERS, BaseBackendManager
 
 
 @BACKEND_MANAGERS.register('torchscript')
 class TorchScriptManager(BaseBackendManager):
+    """This class is modified from `mmdeploy`
+    https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/torchscript/backend_manager.py
+    """
 
     @classmethod
     def build_backend(cls,
@@ -36,7 +39,6 @@ class TorchScriptManager(BaseBackendManager):
                                   input_names=input_names,
                                   output_names=output_names)
 
-
     @classmethod
     def is_available(cls, with_custom_ops: bool = False) -> bool:
         """Check whether backend is installed.
@@ -45,7 +47,7 @@ class TorchScriptManager(BaseBackendManager):
         Returns:
             bool: True if backend package is installed.
         """
-        import importlib.util
+        import importlib
         return importlib.util.find_spec('torch') is not None and \
                importlib.util.find_spec('torchvision') is not None
 
@@ -60,3 +62,28 @@ class TorchScriptManager(BaseBackendManager):
                 return pkg_resources.get_distribution('torch').version
             except Exception:
                 return 'None'
+
+    @classmethod
+    def check_env(cls, log_callback: Callable = lambda _: _) -> str:
+        """Check current environment.
+
+        Returns:
+            str: Info about the environment.
+        """
+        import pkg_resources
+
+        try:
+            if cls.is_available():
+                torch_version = pkg_resources.get_distribution(
+                    'torch').version
+                torchvision_version = pkg_resources.get_distribution(
+                        'torchvision').version
+                torch_info = f'torch:\t{torch_version}'
+                log_callback(torch_info)
+                torchvision_info = f'torchvision:\t{torchvision_version}'
+                log_callback(torchvision_info)
+                info = f'{torch_info}\n{torchvision_info}'
+        except Exception:
+            info = f'{cls.backend_name}:\tCheckFailed'
+            log_callback(info)
+        return info

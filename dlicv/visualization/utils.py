@@ -1,3 +1,5 @@
+#This file is copied from `mmengine`
+#https://github.com/open-mmlab/mmengine/blob/main/mmengine/visualization/utils.py
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
 
 import cv2

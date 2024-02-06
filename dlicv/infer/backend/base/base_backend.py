@@ -1,27 +1,32 @@
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
-from typing import Dict, Union, Sequence, Optional
+from typing import Dict, Union, Sequence, Tuple, Optional, NamedTuple
 
+import torch
 from torch import Tensor
 
 Backend_IOType = Union[Tensor, Sequence[Tensor], Dict[str, Tensor]]
 
-#TODO a cython bug, do not suport NamedTuple object cythonized
-# class BackendIOSpec(NamedTuple):
-#     name: str
-#     index: int
-#     shape: Optional[Union[Tuple[int], Dict[str, Tuple[int]]]]
-#     dtype: Optional[np.dtype]
 
-BackendIOSpec = namedtuple('BackendIOSpec', "name, index, shape, dtype")
+class BackendIOSpec(NamedTuple):
+    """Backend model Inputs and Outputs Specs."""
+
+    index: int
+    name: str
+    shape: Optional[Union[Tuple[int], Dict[str, Tuple[int]]]]
+    dtype: Optional[torch.dtype]
 
 
 class BaseBackend(metaclass=ABCMeta):
-    """Abstract base class for backend.
+    """Abstract base class for inference backend. This class is modified from 
+    `mmdeploy` https://github.com/open-mmlab/mmdeploy/ blob/main/mmdeploy/backend/base/base_wrapper.py
+
     Args:
-        output_names (Sequence[str]): Names to model outputs in order, which is
-        useful when converting the output dict to a ordered list or converting
-        the output ordered list to a key-value dict.
+        backend_files (Sequence[str]): Paths to all required backend files(
+            e.g. '.onnx' for ONNX Runtime, '.param' and '.bin' for ncnn).
+        input_specs (Sequence[BackendIOSPec] | None): Specs of backend model 
+            inputs. Not necessary for certain backend such as 'TorchScript'.
+        output_specs (Sequence[BackendIOSPec] | None): Specs of backend model 
+            outputs.
     """
 
     def __init__(self, 
@@ -99,16 +104,17 @@ class BaseBackend(metaclass=ABCMeta):
         return backend_outputs
     
     def __repr__(self) -> str:
+        indent = ' ' * 4
         repr_str = f'****{self.__class__.__name__}****\n'
         repr_str += 'Backend_File(s):\n'
         for f in self._backend_files:
-            repr_str += '\t' + f + '\n'
+            repr_str += indent + f + '\n'
         if self._input_specs is not None:
             repr_str += 'Input(s):\n'
-            for name, index, shape, dtype in self._input_specs:
-                repr_str += f'\t#{index}  {name}  {dtype}  {shape}\n'
+            for index, name, shape, dtype in self._input_specs:
+                repr_str += f'{indent}#{index}  {name}  {dtype}  {shape}\n'
         if self._output_specs is not None:
             repr_str += 'Output(s):\n'
-            for name, index, shape, dtype in self._output_specs:
-                repr_str += f'\t#{index}  {name}  {dtype}  {shape}\n'
+            for index, name, shape, dtype in self._output_specs:
+                repr_str += f'{indent}#{index}  {name}  {dtype}  {shape}\n'
         return repr_str

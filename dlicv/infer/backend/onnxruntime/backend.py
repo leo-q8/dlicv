@@ -27,22 +27,22 @@ def get_torch_dtype(dtype: str):
 
 
 class ORTBackend(BaseBackend):
-    """ONNXRuntime wrapper for inference.
+    """ONNXRuntime backend for inference. This class is modified from 
+    `mmdeploy` https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/onnxruntime/wrapper.py
 
      Args:
-         onnx_file (str): Input onnx model file.
-         device (str): The device to input model.
-         output_names (Sequence[str] | None): Names of model outputs in order.
-            Defaults to `None` and the wrapper will load the output names from
-            model.
+         model_file (str): Input onnx model file.
+         device_type (str): A string specifying device type. 
+                Defaults to 'cpu'.
+         device_id (int): A number specifying device id. Defaults to 0.
 
      Examples:
-         >>> from mmdeploy.backend.onnxruntime import ORTWrapper
+         >>> from dlicv.infer.backend.onnxruntime import ORTBackend
          >>> import torch
          >>>
-         >>> onnx_file = 'model.onnx'
-         >>> model = ORTWrapper(onnx_file, 'cpu')
-         >>> inputs = dict(input=torch.randn(1, 3, 224, 224, device='cpu'))
+         >>> model_file = 'model.onnx'
+         >>> model = ORTBackend(model_file)
+         >>> inputs = torch.randn(1, 3, 224, 224, device='cpu')
          >>> outputs = model(inputs)
          >>> print(outputs)
     """
@@ -64,13 +64,13 @@ class ORTBackend(BaseBackend):
         for index, input in enumerate(sess.get_inputs()):
             torch_dtype = get_torch_dtype(input.type)
             input_specs.append(
-                BackendIOSpec(input.name, index, 
+                BackendIOSpec(index, input.name, 
                               tuple(input.shape), torch_dtype))
             input_types.append(
                 torch.tensor(1, dtype=torch_dtype).numpy().dtype)
         for index, output in enumerate(sess.get_outputs()):
             output_specs.append(
-                BackendIOSpec(output.name, index, tuple(output.shape), 
+                BackendIOSpec(index, output.name, tuple(output.shape), 
                               get_torch_dtype(output.type)))
             output_types.append(
                 torch.tensor(1, dtype=torch_dtype).numpy().dtype)
@@ -86,9 +86,9 @@ class ORTBackend(BaseBackend):
         ) -> Dict[str, torch.Tensor]:
         """Do inference.
         Args:
-            inputs (Dict[str, np.ndarray]): The input name and tensor pairs.
+            inputs (Dict[str, torch.Tensor]): The input name and tensor pairs.
         Return:
-            Dict[str, np.ndarray]: The output name and tensor pairs.
+            Dict[str, torch.Tensor]: The output name and tensor pairs.
         """
         for input_tensor, input_spec, input_dtype in zip(
                 inputs, self._input_specs, self.input_types):
@@ -122,12 +122,10 @@ class ORTBackend(BaseBackend):
 
     @TimeCounter.count_time(Backend.ONNXRUNTIME.value)
     def __ort_execute(self, io_binding: ort.IOBinding):
-        """Run inference with TorchScript.
+        """Run inference with ONNXRuntime session.
+
         Args:
-            inputs (Sequence[torch.Tensor]): A list of integer binding the
-            input/output.
-        Returns:
-            torch.Tensor | Sequence[torch.Tensor]: The inference outputs from
-            TorchScript.
+            io_binding (ort.IOBinding): To bind input/output to a specified
+                device, e.g. GPU.
         """
         self.sess.run_with_iobinding(io_binding)

@@ -14,7 +14,7 @@ class LoadImgFromNDArray(BaseTransform):
         self.to_float32 = to_float32
         self.to_tensor = to_tensor
         assert to_tensor or device is None, \
-            'device only valid when to_tesor is True'
+            'device only valid when `to_tesor` is True'
         self.device = device
     
     def transform(self, results: dict) -> dict:

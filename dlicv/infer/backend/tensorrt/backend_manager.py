@@ -1,11 +1,14 @@
 import os.path as osp
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Sequence
 
 from ..base import BACKEND_MANAGERS, BaseBackendManager
 
 
 @BACKEND_MANAGERS.register('tensorrt')
 class TensorRTManager(BaseBackendManager):
+    """This class is modified from `mmdeploy`
+    https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/tensorrt/backend_manager.py
+    """
 
     @classmethod
     def build_backend(cls,
@@ -18,7 +21,9 @@ class TensorRTManager(BaseBackendManager):
         """Build the wrapper for the backend model.
         Args:
             backend_files (Sequence[str]): Backend files.
-            device (str, optional): The device info. Defaults to 'cpu'.
+            device_type (str): A string specifying device type. 
+                Defaults to 'cpu'.
+            device_id (int): A number specifying device id. Defaults to 0.
             input_names (Optional[Sequence[str]], optional): input names.
                 Defaults to None.
             output_names (Optional[Sequence[str]], optional): output names.
@@ -38,7 +43,7 @@ class TensorRTManager(BaseBackendManager):
         Returns:
             bool: True if backend package is installed.
         """
-        import importlib.util
+        import importlib
         return importlib.util.find_spec('tensorrt') is not None
 
     @classmethod
@@ -52,3 +57,12 @@ class TensorRTManager(BaseBackendManager):
                 return pkg_resources.get_distribution('tensorrt').version
             except Exception:
                 return 'None'
+    
+    @classmethod
+    def check_env(cls, log_callback: Callable = lambda _: _) -> str:
+        """Check current environment.
+
+        Returns:
+            str: Info about the environment.
+        """
+        return super().check_env(log_callback=log_callback)

@@ -6,16 +6,17 @@ from numpy import ndarray
 from torch import Tensor
 import torch.nn.functional as F
 
-from dlicv.structures import SegDataSample, PixelData
+from dlicv.structures import ClsDataSample, PixelData
 from dlicv.utils import Classes
 from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
 
-SampleList = List[SegDataSample]
+SampleList = List[ClsDataSample]
 ImgsType = List[Union[ndarray, Tensor]]
 
-class BaseSegmentor(BasePredictor):
-    """Base Semantic segmentation predictor.
+
+class BaseClassifier(BasePredictor):
+    """Base image classification predictor.
     
     Args:
         backend_model (dict | torch.nn.Module | BackendModel): A `BackendModel` 
@@ -24,112 +25,76 @@ class BaseSegmentor(BasePredictor):
         pipeline (Callable | Sequence[Callable]): Data preprocess pipeline. A 
             compose of series of data transformation defined in 
             `dlicv.trasnforms`.
-        binary_thres (float | None): Threshold for binary segmentation in the 
-            case of only one output channel. Default: None.
-        align_corners (bool): align_corners argument for resize segmentation 
-            map in :meth:`mask_postprocess` Default: False.
-        use_sigmoid (bool): Whether use sigmoid activation for predict 
-            segmention maps from backend_model. Default: False.
+        binary_thres (float | None): Threshold for binary classification in the 
+            case of only one class. Default: None.
+        use_sigmoid (bool): Whether use sigmoid activation for predict. 
+            Default: False.
     """
 
     def __init__(self, 
                  backend_model: ModelType, 
                  pipeline: Sequence[Callable],
                  binary_thres: Optional[float] = None,
-                 align_corners: bool = False,
+                 use_softmax: bool = False,
                  use_sigmoid: bool = False,
-                 classes: Optional[Union[List[str], str]] = None,
-                 palette: Optional[Union[List[tuple], str, tuple]] = None):
+                 classes: Optional[Union[List[str], str]] = None):
         super().__init__(backend_model, pipeline)
         if binary_thres is not None:
             assert 0. < binary_thres < 1.
         self.binary_thres = binary_thres
-        self.align_corners = align_corners
+
+        assert not (use_sigmoid and use_softmax), ('Only one of `use_sigmoid`'
+            ' and `use_softmax` can be valid')
+        self.use_softmax = use_softmax
         self.use_sigmoid = use_sigmoid
 
         if isinstance(classes, str):
             classes = Classes[classes].value
-            if palette is None:
-                palette = classes
         self.classes = classes
-        self.palette = palette
         self.visualizer = UniversalVisualizer()
     
-    def seg_map_postprocess(self,
-                            seg_map: Tensor,
-                            img_meta: dict) -> Tuple[Tensor, Tensor]:
-        """seg_map post-processing method.
-
-        The seg map would be rescaled to the original image. And would be 
-        normalized if `use_sigmoid` is True.
-
-        Args:
-            seg_map (Tensor[C, H, W]): Predicted segmention map from 
-                :meth:`forward`.
-            img_meta (dict, optional): Image meta info.
-
-        Returns:
-            seg_prob (Tensor[C, H, W]): Predicted prob map of semantic 
-                segmentation.
-            sem_seg (Tensor[1, H, W]): Prediction of semantic segmentation.
-        """
-        C, H, W = seg_map.shape
-
-        # remove padding area.
-        padding = img_meta.get('padding')
-        if padding is not None:
-            left_padding, top_padding, right_padding, bottom_padding = padding
-            seg_map = seg_map[..., top_padding: H - bottom_padding,
-                                    left_padding: W - right_padding]
-        
-        # resize as original shape
-        scale_factor = img_meta.get('scale_factor')
-        if scale_factor is not None:
-            ori_shape = img_meta.get('ori_shape')
-            seg_map = F.interpolate(
-                seg_map[None], ori_shape, mode='bilinear', 
-                align_corners=self.align_corners).squeeze(0)
-        
-        if self.use_sigmoid:
-            seg_map = seg_map.sigmoid()
-        
-        if C > 1: 
-            seg_pred = seg_map.argmax(dim=0, keepdim=True)
-        else:
-            seg_pred = (seg_map > self.binary_thres).to(seg_map)
-
-        return seg_map, seg_pred
-
     def postprocess(self,
-                    pred_seg_maps: Tensor, 
+                    cls_preds: Tensor, 
                     batch_datasamples: SampleList, 
                     **kwargs) -> SampleList:
         """Process a batch of predictions from :meth:`forward` into 
-        `SegDataSample`.
+        `ClsDataSample`.
 
         Args:
-            pred_seg_maps (Tensor): Predicted batched seg maps tensor of the 
-                backend_model, with shape (batch, channel, height, width).
+            cls_preds (Tensor): Batched predicted tensor of the backend_model, 
+                with shape (batch, num_classes).
             batch_datasamples (List[:obj:`SegDataSample`]): Each item 
                 contains the meta information of each image.
 
         Returns:
-            list[:obj:`SegDataSample`]: Segmentation results of the input 
-                images. Each SegDataSample usually contain:
+            list[:obj:`ClsDataSample`]: A list of data samples which contains 
+                the predicted results. Each ClsDataSample usually contain:
 
-            - ``pred_sem_seg``(PixelData): Prediction of semantic segmentation.
-            - ``seg_probs``(PixelData): Predicted probs of semantic
+            - ``pred_score``: Prediction of semantic segmentation.
+            - ``pred_label``: Predicted probs of semantic
                 segmentation after normalization by an activate func.
         """
-        batch_img_metas = [
-            data_samples.metainfo for data_samples in batch_datasamples
-        ]
-        for data_sample, seg_map, img_meta in \
-                zip(batch_datasamples, pred_seg_maps, batch_img_metas):
+        B, C = cls_preds.shape
+        if self.use_softmax:
+            pred_scores = F.softmax(cls_preds, dim=1) 
+        elif self.use_sigmoid:
+            pred_scores = F.sigmoid(cls_preds)
+        else:
+            pred_scores = cls_preds
+        
+        if C > 1: 
+            pred_labels = pred_scores.argmax(dim=1, keepdim=True)
+        else:
+            pred_labels = (pred_scores > self.binary_thres).to(pred_scores)
+         
+        for data_sample, pred_score, pred_label in zip(
+            batch_datasamples, pred_scores, pred_labels):
 
-            seg_probs, seg_pred = self.seg_map_postprocess(seg_map, img_meta)
-            data_sample.seg_probs = PixelData(**{'data': seg_probs})
-            data_sample.pred_sem_seg = PixelData(**{'data': seg_pred})
+            data_sample.pred_score = pred_score
+            data_sample.pred_label = pred_label
+            if self.classes is not None:
+                data_sample.pred_class = self.classes[int(pred_label.item())]
+
         return batch_datasamples
     
     def visualize(self,
@@ -169,8 +134,7 @@ class BaseSegmentor(BasePredictor):
                 else f'{self.num_visualized_imgs:08}.jpg'
             drawn_img = self.visualizer.draw_sem_seg(img, 
                                                      result.pred_sem_seg,
-                                                     classes=self.classes,
-                                                     palette=self.palette)
+                                                     classes=self.classes)
             if show:
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:

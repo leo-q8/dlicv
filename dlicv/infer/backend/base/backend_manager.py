@@ -1,3 +1,5 @@
+# This file is modified from `mmdepoly` 
+# https://github.com/open-mmlab/mmdeploy/blob/main/mmdeploy/backend/base/backend_manager.py
 import importlib
 from abc import ABCMeta
 from typing import Callable, Optional, Sequence
@@ -6,7 +8,8 @@ from .base_backend import BaseBackend
 
 
 class BaseBackendManager(metaclass=ABCMeta):
-    """Abstract interface of backend manager."""
+    """Abstract interface of backend manager. 
+    """
 
     @classmethod
     def build_backend(cls,
@@ -16,19 +19,19 @@ class BaseBackendManager(metaclass=ABCMeta):
                       input_names: Optional[Sequence[str]] = None,
                       output_names: Optional[Sequence[str]] = None,
                       **kwargs) -> BaseBackend:
-        """Build the wrapper for the backend model.
+        """Build the backend for the backend model.
         Args:
             backend_files (Sequence[str]): Backend files.
-            device (str, optional): The device info. Defaults to 'cpu'.
+            device_type (str): A string specifying device type. 
+                Defaults to 'cpu'.
+            device_id (int): A number specifying device id. Defaults to 0.
             input_names (Optional[Sequence[str]], optional): input names.
                 Defaults to None.
             output_names (Optional[Sequence[str]], optional): output names.
                 Defaults to None.
-            deploy_cfg (Optional[Any], optional): The deploy config. Defaults
-                to None.
         """
         raise NotImplementedError(
-            f'build_wrapper has not been implemented for "{cls.__name__}"')
+            f'build_backend has not been implemented for "{cls.__name__}"')
 
     @classmethod
     def is_available(cls, with_custom_ops: bool = False) -> bool:
@@ -84,7 +87,7 @@ class BackendManagerRegistry:
             enum_name (Optional[str], optional): enum name of the backend.
                 if not given, the upper case of name would be used.
         """
-        from dlicv.utils.logging import get_root_logger
+        from dlicv.utils import get_root_logger
         logger = get_root_logger()
 
         if enum_name is None:

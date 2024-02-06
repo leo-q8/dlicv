@@ -90,3 +90,15 @@ class SegDataSample(BaseDataElement):
     @seg_logits.deleter
     def seg_logits(self) -> None:
         del self._seg_logits
+    
+    @property
+    def seg_probs(self) -> PixelData:
+        return self._seg_probs
+    
+    @seg_probs.setter
+    def seg_probs(self, value: PixelData) -> None:
+        self.set_field(value, '_seg_probs', dtype=PixelData)
+
+    @seg_probs.deleter
+    def seg_probs(self) -> None:
+        del self._seg_probs
