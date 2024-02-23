@@ -5,8 +5,8 @@ class Compose:
     """Compose multiple transforms sequentially.
 
     Args:
-        transforms (Sequence[dict, callable], optional): Sequence of transform
-            object or config dict to be composed.
+        transforms (Sequence[callable], optional): Sequence of transform
+            object to be composed.
     """
 
     def __init__(self, transforms: Optional[Sequence[Callable]]):
@@ -22,6 +22,10 @@ class Compose:
                 raise TypeError(
                     f'transform must be a callable object or dict, '
                     f'but got {type(transform)}')
+    
+    def __iter__(self):
+        """Allow easy iteration over the transform sequence."""
+        return iter(self.transforms)
 
     def __call__(self, data: dict) -> Optional[dict]:
         """Call function to apply transforms sequentially.

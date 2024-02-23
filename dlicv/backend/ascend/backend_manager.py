@@ -13,7 +13,7 @@ class AscendManager(BaseBackendManager):
     @classmethod
     def build_backend(cls,
                       backend_files: Sequence[str], 
-                      device: str = 'cpu',
+                      device_type: str = 'cpu',
                       device_id: int = 0,
                       input_names: Optional[Sequence[str]] = None,
                       output_names: Optional[Sequence[str]] = None,
@@ -21,7 +21,9 @@ class AscendManager(BaseBackendManager):
         """Build the wrapper for the backend model.
         Args:
             backend_files (Sequence[str]): Backend files.
-            device (str, optional): The device info. Defaults to 'cpu'.
+            device_type (str): A string specifying device type. 
+                Defaults to 'cpu'.
+            device_id (int): A number specifying device id. Defaults to 0.
             input_names (Optional[Sequence[str]], optional): input names.
                 Defaults to None.
             output_names (Optional[Sequence[str]], optional): output names.

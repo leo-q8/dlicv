@@ -91,8 +91,8 @@ install_requires = parse_requirements()
 setup(
     name='dlicv',
     version=get_version(),
-    description='a Deep Learning inference tool box for Computer Vision',
-    url='https://github.com/open-mmlab/mmengine',
+    description='a Deep Learning Inference tool box for Computer Vision',
+    url='',
     author='XueQing Wang',
     author_email='870530576@qq.com',
     packages=find_packages(),

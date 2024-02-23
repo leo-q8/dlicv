@@ -20,6 +20,7 @@ _from_acl_data_type = {
 
 class AscendBackend(BaseBackend):
     """Ascend backbend for inference.
+
     Args:
         model_file (str): Ascend off-line inference model file.
         device_id (int): A number specifying ascend device id. 

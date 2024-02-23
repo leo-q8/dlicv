@@ -96,6 +96,12 @@ class BasePredictor(metaclass=PredictorMeta):
             compose of series of data transformation defined in 
             `dlicv.trasnforms`.
     """
+    preprocess_kwargs: set = set()
+    forward_kwargs: set = set()
+    visualize_kwargs: set = set()
+    postprocess_kwargs: set = set()
+    conflict_kwargs :set = set()
+    all_kwargs:set = set()
 
     def __init__(self, 
                  backend_model: ModelType,
@@ -122,7 +128,7 @@ class BasePredictor(metaclass=PredictorMeta):
         """Call the predictor.  
 
         The ``BasePredictor`` assumes the data processed by ``pipeline`` 
-        is a dict containing keys of 'ori_inputs', 'inputs' and 'data_samples', 
+        is a dict containing keys of 'ori_imgs', 'inputs' and 'data_samples', 
         representing the original inputs, the model-feedable input data and a
         `dlicv.structure.BaseDataElement` instance which warps some meta-info 
         useful for :meth:`postprocess`.
@@ -167,7 +173,7 @@ class BasePredictor(metaclass=PredictorMeta):
                                        **postprocess_kwargs)
             results_dict['predictions'].extend(results)
             # Visualize the results.
-            visualization = self.visualize(data['ori_inputs'], 
+            visualization = self.visualize(data['ori_imgs'], 
                                            results, 
                                            show=show, 
                                            wait_time=wait_time,

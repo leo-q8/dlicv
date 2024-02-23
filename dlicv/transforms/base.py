@@ -1,3 +1,5 @@
+#This file is copied from `mmcv`
+#https://github.com/open-mmlab/mmcv/blob/main/mmcv/transforms/base.py
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union
 

@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
@@ -21,6 +21,7 @@ try:
 except Exception:
     IS_DIPU_AVAILABLE = False
 
+DeviceType = Union[str, torch.device]
 
 def get_max_cuda_memory(device: Optional[torch.device] = None) -> int:
     """Returns the maximum GPU memory occupied by tensors in megabytes (MB) for
