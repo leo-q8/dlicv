@@ -123,7 +123,7 @@ class BackendManagerRegistry:
             BaseBackendManager: backend manager of the given backend.
         """
         # try import backend if backend is in `backend`
-        importlib.import_module('dlicv.infer.backend.' + name)
+        importlib.import_module('dlicv.backend.' + name)
         return self._module_dict.get(name, None)
 
 

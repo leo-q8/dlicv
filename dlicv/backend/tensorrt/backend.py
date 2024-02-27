@@ -59,7 +59,7 @@ class TRTBackend(BaseBackend):
         device_id (int): A number specifying the cuda device id.
 
     Examples:
-        >>> from dlicv.infer.backend.tensorrt import TRTBackend
+        >>> from dlicv.backend.tensorrt import TRTBackend
         >>> engine_file = 'resnet.engine'
         >>> model = TRTBackend(engine_file)
         >>> inputs = torch.randn(1, 3, 224, 224).cuda()

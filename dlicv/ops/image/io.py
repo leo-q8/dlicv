@@ -1,10 +1,13 @@
-from typing import Union
+import os.path as osp
+from typing import Union, Optional
 
 import cv2
 import numpy as np
 from cv2 import (IMREAD_COLOR, IMREAD_GRAYSCALE, IMREAD_IGNORE_ORIENTATION,
                  IMREAD_UNCHANGED)
 from pathlib import Path
+
+from dlicv.utils import mkdir_or_exist
 
 try:
     from turbojpeg import TJCS_RGB, TJPF_BGR, TJPF_GRAY, TurboJPEG
@@ -179,3 +182,30 @@ def imread(img_path: Union[str, Path],
         if flag == IMREAD_COLOR and channel_order == 'rgb':
             cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)
         return img
+
+
+def imwrite(img: np.ndarray,
+            file_path: Union[str, Path],
+            params: Optional[list] = None) -> bool:
+    """Write image to file.
+
+    Args:
+        img (ndarray): Image array to be written.
+        file_path (str): Image file path.
+        params (None or list): Same as opencv :func:`imwrite` interface.
+
+    Returns:
+        bool: Successful or not.
+
+    """
+    file_path = str(file_path)
+    img_ext = osp.splitext(file_path)[-1]
+    # Encode image according to image suffix.
+    # For example, if image path is '/path/your/img.jpg', the encode
+    # format is '.jpg'.
+    flag, img_buff = cv2.imencode(img_ext, img, params)
+    
+    mkdir_or_exist(osp.dirname(file_path))
+    with open(file_path, 'wb') as f:
+        f.write(img_buff.tobytes())
+    return flag

@@ -1,12 +1,13 @@
 import os.path as osp
 from typing import List, Callable, Optional, Sequence, Tuple, Union
 
-import cv2
 from numpy import ndarray
 from torch import Tensor
 import torch.nn.functional as F
 
-from dlicv.structures import ClsDataSample, PixelData
+from dlicv.ops import imwrite
+from dlicv.structures import ClsDataSample
+from dlicv.transforms import PackImgInputs, Compose
 from dlicv.utils import Classes
 from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
@@ -38,16 +39,25 @@ class BaseClassifier(BasePredictor):
                  use_softmax: bool = False,
                  use_sigmoid: bool = False,
                  classes: Optional[Union[List[str], str]] = None):
-        super().__init__(backend_model, pipeline)
         if binary_thres is not None:
             assert 0. < binary_thres < 1.
-        self.binary_thres = binary_thres
-
         assert not (use_sigmoid and use_softmax), ('Only one of `use_sigmoid`'
-            ' and `use_softmax` can be valid')
+            ' and `use_softmax` can be set')
+
+        if isinstance(pipeline, (list, tuple)):
+            if not isinstance(pipeline[-1], PackImgInputs):
+                pipeline = list(pipeline)
+                pipeline.append(PackImgInputs(ClsDataSample))
+        elif isinstance(pipeline, Compose):
+            if not isinstance(pipeline.transforms[-1], PackImgInputs):
+                pipeline.transforms.append(PackImgInputs(ClsDataSample))
+        else:
+            pipeline = Compose([pipeline, PackImgInputs(ClsDataSample)])
+        super().__init__(backend_model, pipeline)
+
+        self.binary_thres = binary_thres
         self.use_softmax = use_softmax
         self.use_sigmoid = use_sigmoid
-
         if isinstance(classes, str):
             classes = Classes[classes].value
         self.classes = classes
@@ -132,13 +142,14 @@ class BaseClassifier(BasePredictor):
                 img = img.detach().cpu().numpy().transpose(1, 2, 0)
             img_name = osp.basename(result.img_path) if 'img_path' in result \
                 else f'{self.num_visualized_imgs:08}.jpg'
-            drawn_img = self.visualizer.draw_sem_seg(img, 
-                                                     result.pred_sem_seg,
-                                                     classes=self.classes)
+            if 'channel_order' in result and result.channel_order != 'rgb':
+                img = img[..., ::-1]
+            drawn_img = self.visualizer.draw_cls(img, result,
+                                                 classes=self.classes)
             if show:
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
                 vis_file = osp.join(show_dir, 'vis', img_name)
-                cv2.imwrite(vis_file, drawn_img)
+                imwrite(drawn_img[..., ::-1], vis_file)
             visualizations.append(img)
         return visualizations

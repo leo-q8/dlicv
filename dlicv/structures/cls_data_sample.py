@@ -148,11 +148,11 @@ class ClsDataSample(BaseDataElement):
     def gt_class(self) -> str:
         return self._gt_class
     
-    @property.setter
+    @gt_class.setter
     def gt_class(self, gt_class: str):
         self.set_field(gt_class, '_gt_class', dtype=str)
 
-    @property.deleter
+    @gt_class.deleter
     def gt_class(self):
         del self._gt_class
 
@@ -171,7 +171,7 @@ class ClsDataSample(BaseDataElement):
 
     @property
     def pred_score(self):
-        return self._pred_socre
+        return self._pred_score
 
     @pred_score.setter
     def pred_score(self, value: SCORE_TYPE) -> 'ClsDataSample':
@@ -195,11 +195,11 @@ class ClsDataSample(BaseDataElement):
     def pred_class(self) -> str:
         return self._pred_class
     
-    @property.setter
+    @pred_class.setter
     def pred_class(self, pred_class: str):
         self.set_field(pred_class, '_pred_class', dtype=str)
 
-    @property.deleter
+    @pred_class.deleter
     def pred_class(self):
         del self._pred_class
     

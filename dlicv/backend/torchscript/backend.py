@@ -25,7 +25,7 @@ class TorchScriptBackend(BaseBackend):
         If the engine is converted from onnx model. The input_names and
         output_names should be the same as onnx model.
     Examples:
-        >>> from dlicv.infer.backend.torchscript import TorchscriptWrapper
+        >>> from dlicv.backend.torchscript import TorchscriptWrapper
         >>> model_file = 'resnet.pt'
         >>> model = TorchscriptWrapper(model_file, input_names=['input'], \
         >>>    output_names=['output'])
@@ -46,9 +46,10 @@ class TorchScriptBackend(BaseBackend):
             self.device = f'{device_type}:{device_id}'
         else:
             self.device = device_type
-        ts_model = torch.jit.load(model_file, map_location='cpu')
+        ts_model = torch.jit.load(model_file, map_location=self.device)
         assert isinstance(ts_model, torch.jit.RecursiveScriptModule
                           ), 'failed to load torchscript model.'
+        ts_model.eval()
         self.ts_model = ts_model.to(self.device)
         if input_names is not None:
             input_specs = []

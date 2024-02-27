@@ -13,6 +13,8 @@ class PackImgInputs(BaseTransform):
 
         - ``ori_shape``: original shape of the image as a tuple (h, w)
 
+        - ``channel_order: Order of original input image's channel.
+
         - ``img_shape``: shape of the image input to the network as a tuple \
             (h, w).  Note that images may be zero padded on the \
             bottom/right if the batch tensor is larger than this shape.
@@ -29,8 +31,8 @@ class PackImgInputs(BaseTransform):
     """
     def __init__(self,
                  datasample_type: type,
-                 meta_keys=('img_path', 'ori_shape', 'img_shape',
-                            'scale_factor', 'padding')):
+                 meta_keys=('img_path', 'ori_shape', 'channel_order', 
+                            'img_shape', 'scale_factor', 'padding')):
         self.datasample_type = datasample_type
         self.meta_keys = meta_keys
 
