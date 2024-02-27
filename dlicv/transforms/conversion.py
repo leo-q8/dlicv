@@ -90,8 +90,8 @@ class Normalize(BaseTransform):
     def __init__(self,
                  mean: Sequence[Number],
                  std: Sequence[Number]) -> None:
-        self.mean = mean
-        self.std = std
+        self.mean = list(mean)
+        self.std = list(std)
     
     def _normalize_tensor_img(self, img: torch.Tensor) -> torch.Tensor:
         img = img.to(torch.float32)

@@ -84,7 +84,7 @@ def imresize(img: ImgType,
         img (ndarray | tensor): The input image.
         size (int | Tuple[int, int] | None): Target size. if size is a tuple 
             like (w, h), output size will be matched to this. If size is an 
-            int, bigger edge of the image will bo matched to this number.
+            int, bigger edge of the image will be matched to this number.
             i.e., If height > width, then image will be rescaled to
             (size, size * width / height).
         scale_factor (float | Tuple[float, float] | None): The scaling factor.
@@ -111,8 +111,8 @@ def imresize(img: ImgType,
             'only one of `size` or `scale_factor` should be defined') 
     elif size is not None:
         if isinstance(size, int):
-            new_w, new_h = int(size * w / h + 0.5), size if w <= h else \
-                           size, int(size * h / w + 0.5)
+            new_w, new_h = (int(size * w / h + 0.5), size) if w <= h else (
+                           size, int(size * h / w + 0.5))
         else:
             new_w, new_h = size
     elif scale_factor is not None:
@@ -358,7 +358,7 @@ def imrotate(img: ImgType,
     """Rotate an image.
 
     Args:
-        img (np.ndarray): Image to be rotated.
+        img (ndarray | Tenosr): Image to be rotated.
         angle (float): Rotation angle in degrees, positive values mean
             clockwise rotation.
         center (tuple[float], optional): Center point (w, h) of the rotation in
@@ -412,9 +412,29 @@ def imrotate(img: ImgType,
 def imcrop(img: ImgType,
            bboxes: Union[torch.Tensor, np.ndarray],
            scale: float = 1.0,
-           pad: float = 0,
+           pad: int = 0,
            pad_fill: Union[float, list, None] = None,
 ) -> Union[ImgType, List[ImgType]]:
+    """Crop image patches.
+
+    3 steps: scale the bboxes -> clip bboxes -> crop and pad.
+
+    Args:
+        img (ndarray | Tensor): Image to be cropped.
+        bboxes (ndarray): Shape (k, 4) or (4, ), location of cropped bboxes.
+        scale (float, optional): Scale ratio of bboxes, the default value
+            1.0 means no scaling.
+        pad (int, optional): The number of pixels to add to the width and 
+            height of the bounding box. Defaults to 0.
+        pad_fill (Number | list[Number]): Value to be filled for padding.
+            Default: None, which means no padding.
+
+    Returns:
+        patches (List[ImgType] | ImgType): The cropped image patches.
+        returned_boxes (List[ndarray | Tenosr] | ndarray | Tensor): The boxes 
+            corresponding to the cropped pathches.
+
+    """
     def _ndarray_img_slice(img, x1, y1, x2, y2):
         return img[y1:y2 + 1, x1:x2 + 1, ...]
 

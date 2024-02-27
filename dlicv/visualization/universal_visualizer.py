@@ -7,6 +7,7 @@ import torch
 
 from dlicv.ops import bitmap_to_polygon, imresize
 from dlicv.structures import InstanceData, PixelData, ClsDataSample
+from .color import color_val
 from .palette import _get_adaptive_scales, get_palette, jitter_color
 from .utils import tensor2ndarray
 from . import Visualizer
@@ -357,7 +358,7 @@ class UniversalVisualizer(Visualizer):
         return self.get_image()
 
     def draw_instances(self, image: np.ndarray, 
-                       instances: ['InstanceData'],
+                       instances: InstanceData,
                        classes: Optional[Sequence[str]] = None,
                        palette: Optional[Union[Sequence[tuple], str]] = None,
                        kpt_thr: float = 0.3,
@@ -414,6 +415,9 @@ class UniversalVisualizer(Visualizer):
         labels = np.array(ids, dtype=np.int64)
 
         colors = [mask_palette[label] for label in labels]
+        mask = np.zeros_like(image, dtype=np.uint8)
+        for label, color in zip(labels, colors):
+            mask[sem_seg[0] == label, :] = color
         self.set_image(image)
 
         if show_labels:
@@ -466,13 +470,13 @@ class UniversalVisualizer(Visualizer):
                     text = f'class {classes_id}'
                 (label_width, label_height), baseline = cv2.getTextSize(
                     text, font, fontScale, thickness)
-                mask = cv2.rectangle(mask, loc,
-                                     (loc[0] + label_width + baseline,
-                                      loc[1] + label_height + baseline),
-                                     classes_color, -1)
-                mask = cv2.rectangle(mask, loc,
-                                     (loc[0] + label_width + baseline,
-                                      loc[1] + label_height + baseline),
+                mask = cv2.rectangle(mask, loc, 
+                                     (loc[0] + label_width + baseline, 
+                                      loc[1] + label_height + baseline), 
+                                     color_val(classes_color), -1)
+                mask = cv2.rectangle(mask, loc, 
+                                     (loc[0] + label_width + baseline, 
+                                      loc[1] + label_height + baseline), 
                                      (0, 0, 0), rectangleThickness)
                 mask = cv2.putText(mask, text, (loc[0], loc[1] + label_height),
                                    font, fontScale, text_colors[classes_id], 

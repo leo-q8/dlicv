@@ -197,7 +197,7 @@ class Pad(BaseTransform):
         repr_str += f'to_square={self.to_square}, '
         repr_str += f'pad_position={self.pad_position}, '
         repr_str += f'pad_val={self.pad_val}, '
-        repr_str += f'padding_mode={self.padding_mode})'
+        repr_str += f"padding_mode='{self.padding_mode}')"
         return repr_str
         
          

@@ -37,7 +37,7 @@ class ORTBackend(BaseBackend):
          device_id (int): A number specifying device id. Defaults to 0.
 
      Examples:
-         >>> from dlicv.infer.backend.onnxruntime import ORTBackend
+         >>> from dlicv.backend.onnxruntime import ORTBackend
          >>> import torch
          >>>
          >>> model_file = 'model.onnx'

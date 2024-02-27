@@ -2,14 +2,14 @@ from abc import abstractmethod
 import os.path as osp
 from typing import Any, List, Callable, Optional, Sequence, Tuple, Union
 
-import cv2
 from numpy import ndarray
 from torch import Tensor
 
 from dlicv.structures import DetDataSample, InstanceData
-from dlicv.ops.boxes import batched_nms, box_wh
+from dlicv.ops import batched_nms, box_wh, imwrite
 from dlicv.visualization import UniversalVisualizer
 from dlicv.utils import Classes
+from dlicv.transforms import Compose, PackImgInputs
 from .base import BasePredictor, ModelType
 
 SampleList = List[DetDataSample]
@@ -35,24 +35,28 @@ class BaseDetector(BasePredictor):
             operation will be executed in :meth:`bbox_postprocess` before 
             return boxes. Defaults to None.
             Valid keys are:
+
                 - iou_thres (float): IoU threshold to be considered as 
                     conflicted.
+
                 - class_agnostic (bool): Whether generate class agnostic 
                     prediction. If True, the model is agnostic to the number of 
                     classes, and all classes will be considered as one.
+
                 - nms_pre (int): The maximum number of boxes into NMS 
                     opreation.
+
         min_box_size (int): The minimum box width and height in pixels. If > 0,
             the bboxes small than it will be filtered. Defaults to -1.
         max_det (int): The maximum number of boxes after `postprocess`
         classes (List[str], optional): Category information.
-        palette (List[tuple], optional): Palette information
-                corresponding to the category.
+        palette (List[tuple], optional): Palette information corresponding to 
+            the category.
     """
     
     def __init__(self, 
                  backend_model: ModelType, 
-                 pipeline: Sequence[Callable],
+                 pipeline: Union[Callable, Sequence[Callable]],
                  conf: Optional[float] = None,
                  nms_cfg: Optional[dict] = None,
                  min_box_size: int = -1,
@@ -65,18 +69,27 @@ class BaseDetector(BasePredictor):
                 f'{set(nms_cfg) - valid_nms_params} is invalid nms params'
         if conf is not None:
             assert 0. < conf < 1.
+        if isinstance(pipeline, (list, tuple)):
+            if not isinstance(pipeline[-1], PackImgInputs):
+                pipeline = list(pipeline)
+                pipeline.append(PackImgInputs(DetDataSample))
+        elif isinstance(pipeline, Compose):
+            if not isinstance(pipeline.transforms[-1], PackImgInputs):
+                pipeline.transforms.append(PackImgInputs(DetDataSample))
+        else:
+            pipeline = Compose([pipeline, PackImgInputs(DetDataSample)])
+        super().__init__(backend_model, pipeline)
+
+        self.conf = conf
+        self.min_box_size = min_box_size
+        self.nms_cfg = nms_cfg
+        self.max_det = max_det
         if isinstance(classes, str):
             classes = Classes[classes].value
             if palette is None:
                 palette = classes
         self.classes = classes
         self.palette = palette
-        self.conf = conf
-        super().__init__(backend_model, pipeline)
-
-        self.min_box_size = min_box_size
-        self.nms_cfg = nms_cfg
-        self.max_det = max_det
         self.visualizer = UniversalVisualizer()
     
     @abstractmethod
@@ -229,7 +242,7 @@ class BaseDetector(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
-                  **kwargs) -> Optional[Union[ndarray, List[ndarray]]]:
+                  **kwargs) -> Optional[List[ndarray]]:
         """Visualize predictions.
 
         Customize your visualization by overriding this method. visualize
@@ -258,6 +271,8 @@ class BaseDetector(BasePredictor):
                 img = img.detach().cpu().numpy().transpose(1, 2, 0)
             img_name = osp.basename(result.img_path) if 'img_path' in result \
                 else f'{self.num_visualized_imgs:08}.jpg'
+            if 'channel_order' in result and result.channel_order != 'rgb':
+                img = img[..., ::-1]
             drawn_img = self.visualizer.draw_instances(img, 
                                                        result.pred_instances,
                                                        classes=self.classes,
@@ -266,6 +281,6 @@ class BaseDetector(BasePredictor):
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
                 vis_file = osp.join(show_dir, 'vis', img_name)
-                cv2.imwrite(vis_file, drawn_img)
+                imwrite(drawn_img[..., ::-1], vis_file)
             visualizations.append(img)
         return visualizations

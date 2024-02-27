@@ -24,6 +24,7 @@ class LoadImage(BaseTransform):
 
     - img
     - ori_img
+    - channel_order
     - img_shape
     - ori_shape
 
@@ -60,7 +61,7 @@ class LoadImage(BaseTransform):
             'device only valid when `to_tesor` is True'
         self.device = device
     
-    def transform(self, results: Dict) -> Dict | Tuple[List, List] | None:
+    def transform(self, results: dict) -> dict:
         res = dict()
         if 'img_path' in results:
             res['img_path'] = results['img_path']
@@ -71,6 +72,7 @@ class LoadImage(BaseTransform):
         elif 'ori_img' in results:
             img = results['ori_img']
         
+        res['channel_order'] = self.channel_order
         res['ori_img'] = img
         shape = img.shape[:2]
         if self.to_tensor:
@@ -97,8 +99,8 @@ class LoadImage(BaseTransform):
                     f"color_type='{self.color_type}', "
                     f"channel_order='{self.channel_order}', "
                     f"imdecode_backend='{self.imdecode_backend}', "
-                    f'to_float32={self.to_float32}, ',
-                    f'to_tensor={self.to_tensor}, ',
+                    f'to_float32={self.to_float32}, '
+                    f'to_tensor={self.to_tensor}, '
                     f'device={self.device})')
         return repr_str
 
@@ -114,6 +116,7 @@ class LoadImgFromNDArray(BaseTransform):
 
     - img
     - ori_img
+    - channel_order
     - img_shape
     - ori_shape
 
@@ -126,21 +129,28 @@ class LoadImgFromNDArray(BaseTransform):
             Defaults to False.
         device (str | torch.device | None): The targer device to store tensor 
             image. Only valid when `to_tensor` is True.
+        channel_order:  Order of original input array image's channel, 
+            candidates are `bgr` and `rgb`. This parameter will be saved in 
+            results dict as it.
     """
     def __init__(self, 
                  to_float32: bool = False,
                  to_tensor: bool = False,
-                 device: Optional[str] = None):
+                 device: Optional[str] = None,
+                 channel_order: str = 'bgr'):
         self.to_float32 = to_float32
         self.to_tensor = to_tensor
         assert to_tensor or device is None, \
             'device only valid when `to_tesor` is True'
         self.device = device
+        assert channel_order in ('bgr', 'rgb')
+        self.channel_order = channel_order
     
     def transform(self, results: dict) -> dict:
         res = dict()
         img = results['ori_img']
         res['ori_img'] = img
+        res['channel_order'] = self.channel_order
         shape = img.shape[:2]
         if self.to_tensor:
             if len(img.shape) < 3:
@@ -164,7 +174,8 @@ class LoadImgFromNDArray(BaseTransform):
         repr_str = self.__class__.__name__
         repr_str += f'(to_float32={self.to_float32}, ',
         repr_str += f'to_tensor={self.to_tensor}, ',
-        repr_str += f'device={self.device})'
+        repr_str += f'device={self.device}, '
+        repr_str += f"channel_order='{self.channel_order}')"
         return repr_str
 
             
@@ -179,6 +190,7 @@ class LoadImgFromTensor(BaseTransform):
 
     - img
     - ori_img
+    - channel_order
     - img_shape
     - ori_shape
 
@@ -188,16 +200,22 @@ class LoadImgFromTensor(BaseTransform):
             Defaults to False.
         device (str | torch.device | None): The targer device to store tensor 
             image. Only valid when `to_tensor` is True.
-    """
+    channel_order: Order of original input tensor image's channel, candidates 
+        are `bgr` and `rgb`. This parameter will be saved in res dict as it.
+    """ 
     def __init__(self, 
                  to_float32: bool = False,
-                 device: Optional[str] = None):
+                 device: Optional[str] = None,
+                 channel_order = 'bgr'):
         self.to_float32 = to_float32
         self.device = device
+        assert channel_order in ('bgr', 'rgb')
+        self.channel_order = channel_order
     
     def transform(self, results: dict) -> dict:
         res = dict()
         img: torch.Tensor = results['ori_img']
+        res['channel_order'] = self.channel_order
         if img.ndim < 2:
             raise ValueError
         elif img.ndim == 2:
@@ -215,5 +233,7 @@ class LoadImgFromTensor(BaseTransform):
     
     def __repr__(self) -> str:
         repr_str = self.__class__.__name__
-        repr_str += f'(to_float32={self.to_float32}, device={self.device})'
+        repr_str += f'(to_float32={self.to_float32}, '
+        repr_str += f'device={self.device}, '
+        repr_str += f"channel_order='{self.channel_order}')"
         return repr_str

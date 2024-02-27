@@ -2,10 +2,11 @@ from .base import BaseTransform
 from .conversion import ImgToTensor, Normalize 
 from .fromatting import PackImgInputs
 from .geometry import Resize, Pad
-from .loading import LoadImgFromNDArray, LoadImgFromTensor
+from .loading import LoadImage, LoadImgFromNDArray, LoadImgFromTensor
 from .wrappers import Compose
 
 __all__ = [
-    'BaseTransform', 'Compose', 'LoadImgFromNDArray', 'LoadImgFromTensor', 
-    'Resize', 'Pad', 'ImgToTensor', 'Normalize', 'PackImgInputs',
+    'BaseTransform', 'Compose', 'LoadImage', 'LoadImgFromNDArray', 
+    'LoadImgFromTensor', 'Resize', 'Pad', 'ImgToTensor', 'Normalize', 
+    'PackImgInputs'
 ]

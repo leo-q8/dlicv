@@ -44,7 +44,7 @@ def get_palette(palette: Union[List[tuple], str, tuple],
         np.random.seed(42)
         palette = np.random.randint(0, 256, size=(num_classes, 3))
         np.random.set_state(state)
-        dataset_palette = [tuple(c) for c in palette]
+        dataset_palette = [tuple(c.tolist()) for c in palette]
     elif palette == 'coco':
         dataset_palette = [
             (220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),

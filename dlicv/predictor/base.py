@@ -29,7 +29,7 @@ class PredictorMeta(ABCMeta):
 
     This MetaClass firstly captures the keyword parameters set of 
     :meth:`preprocess`, :meth:`forward`, :meth:`postprocess` and 
-    :meth:`visualize`. Than save as the class attribute ``preprocess_kwargs``,
+    :meth:`visualize`. And save as the class attribute ``preprocess_kwargs``,
     ``forward_kwargs``, ``postprocess_kwargs`` and ``visualize_kwargs`` 
     respectively. Next, save the duplicate keyword parameters and it's function 
     names to ``conflict_kwargs``, and save the set of all parameters in 
@@ -38,17 +38,18 @@ class PredictorMeta(ABCMeta):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        expt_args = {'self', 'kwargs'}
         self.preprocess_kwargs = set(inspect.signature(
-            self.preprocess).parameters.keys()) - {'self'}
+            self.preprocess).parameters.keys()) - expt_args
         self.forward_kwargs = set(inspect.signature(
-            self.forward).parameters.keys()) - {'self'}
+            self.forward).parameters.keys()) - expt_args
         self.postprocess_kwargs = set(inspect.signature(
-            self.postprocess).parameters.keys()) - {'self'}
+            self.postprocess).parameters.keys()) - expt_args
         self.visualize_kwargs = set(inspect.signature(
-            self.visualize).parameters.keys()) - {'self'}
+            self.visualize).parameters.keys()) - expt_args
 
-        self.all_kwargs = self.preprocess_kwargs | self.forward_kwargs \
-            | self.visualize_kwargs | self.postprocess_kwargs
+        self.all_kwargs = self.preprocess_kwargs | self.forward_kwargs | \
+            self.visualize_kwargs | self.postprocess_kwargs
 
         conflict_kwargs = defaultdict(set)
         KwargsTuple = namedtuple('KwargsTuple', ['func_name', 'kwargs'])
@@ -69,14 +70,11 @@ class PredictorMeta(ABCMeta):
 class BasePredictor(metaclass=PredictorMeta):
     """Base predictor for downstream computer vision tasks. 
 
-    This class is modified from `mmengine` 
-    https://github.com/open-mmlab/mmengine/blob/main/mmengine/infer/infer.py
-
     The BasePredictor provides the standard workflow for inference as follows:
 
     1. Preprocess the input data by :meth:`preprocess`.
     2. Forward the data to the model by :meth:`forward`. The type of 
-       `backend_model` is `torch.nn.Module` or `dlicv.infer.BackendModel` 
+       `backend_model` is `torch.nn.Module` or `dlicv.BackendModel` 
        and it's :meth:``__call__`` will be called by default.
     3. Postprocess the backend_model's outputs and return the results 
        by :meth:`postprocess`.
@@ -87,6 +85,9 @@ class BasePredictor(metaclass=PredictorMeta):
 
     Subclasses inherited from ``BasePredictor`` should implement
     :meth:`postprocess` and :meth:`visualize`
+
+    This class is modified from `mmengine` 
+    https://github.com/open-mmlab/mmengine/blob/main/mmengine/infer/infer.py
 
     Args:
         backend_model (dict | torch.nn.Module | BackendModel): A `BackendModel` 
@@ -100,7 +101,7 @@ class BasePredictor(metaclass=PredictorMeta):
     forward_kwargs: set = set()
     visualize_kwargs: set = set()
     postprocess_kwargs: set = set()
-    conflict_kwargs :set = set()
+    conflict_kwargs :defaultdict = defaultdict(set)
     all_kwargs:set = set()
 
     def __init__(self, 
@@ -162,26 +163,28 @@ class BasePredictor(metaclass=PredictorMeta):
         # Preprocess the user inputs into a model-feedable fromat.
         inputs = self.preprocess(inputs, batch_size, **preprocess_kwargs)
 
-        results_dict = defaultdict(list)
+        results, visualizations = [], [] 
         for data in (track(inputs, description='Predict') 
                      if show_progress else inputs):
             # Predict the data with the `backend_model`.
             preds = self.forward(data['inputs'], **forward_kwargs)
             # Postprocess the backend_model's outputs.
-            results = self.postprocess(preds, 
-                                       data['data_samples'],
-                                       **postprocess_kwargs)
-            results_dict['predictions'].extend(results)
+            batch_results = self.postprocess(preds, 
+                                             data['data_samples'],
+                                             **postprocess_kwargs)
+            results.extend(batch_results)
             # Visualize the results.
-            visualization = self.visualize(data['ori_imgs'], 
-                                           results, 
-                                           show=show, 
-                                           wait_time=wait_time,
-                                           show_dir=show_dir,
-                                           **visualize_kwargs)
-            if return_vis and visualization is not None:
-                results_dict['visualization'].extend(visualization)
-        return results_dict
+            batch_visualizations = self.visualize(data['ori_imgs'], 
+                                                  batch_results, 
+                                                  show=show, 
+                                                  wait_time=wait_time,
+                                                  show_dir=show_dir,
+                                                  **visualize_kwargs)
+            if batch_visualizations is not None:
+                visualizations.extend(visualizations)   
+
+        return {'results': results, 'visualizations': visualizations} if \
+            return_vis else {'results': results}
 
     def _inputs_to_list(self, 
                         inputs: InputsType,
@@ -207,8 +210,9 @@ class BasePredictor(metaclass=PredictorMeta):
             path = str(Path(inputs).absolute())
             if os.path.isdir(path):
                 batch_size = 1 if batch_size is None else batch_size
-                inputs = sorted(filter(lambda f: f.suffix in IMG_EXTENSIONS,
-                                glob.glob(os.path.join(path, '*.*'))))
+                inputs = sorted(
+                    filter(lambda f: f.split('.')[-1] in IMG_EXTENSIONS,
+                    glob.glob(os.path.join(path, '*.*'))))
             elif os.path.isfile(path):
                 batch_size = 1
         elif isinstance(inputs, torch.Tensor) and inputs.ndim == 4:
@@ -322,7 +326,7 @@ class BasePredictor(metaclass=PredictorMeta):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[Union[str, Path]] = None,
-                  **kwargs) -> Optional[Union[np.ndarray, List[np.ndarray]]]:
+                  **kwargs) -> Optional[List[np.ndarray]]:
         """Visualize predictions.
 
         Customize your visualization by overriding this method. visualize
@@ -359,7 +363,7 @@ class BasePredictor(metaclass=PredictorMeta):
                 '`forward`, `visualize` and `postprocess`')
             
         # Ensure each argument only matches one function
-        conflict_kwargs = self.conflict_kwargs & set(kwargs.keys())
+        conflict_kwargs = set(self.conflict_kwargs) & set(kwargs)
         if conflict_kwargs:
             errmsgs = [
                 f'conflict argument `{kw}` for {self.conflict_kwargs[kw]}'
