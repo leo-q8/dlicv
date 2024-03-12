@@ -1,7 +1,7 @@
 import os.path as osp
 from typing import List, Callable, Optional, Sequence, Tuple, Union
 
-from numpy import ndarray
+import numpy as np
 from torch import Tensor
 import torch.nn.functional as F
 
@@ -13,7 +13,7 @@ from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
 
 SampleList = List[SegDataSample]
-ImgsType = List[Union[ndarray, Tensor]]
+ImgsType = List[Union[np.ndarray, Tensor]]
 
 class BaseSegmentor(BasePredictor):
     """Base Semantic segmentation predictor.
@@ -59,9 +59,9 @@ class BaseSegmentor(BasePredictor):
         super().__init__(backend_model, pipeline)
 
         if isinstance(classes, str):
-            classes = Classes[classes].value
             if palette is None:
                 palette = classes
+            classes = Classes[classes].value
         self.classes = classes
         self.palette = palette
         self.visualizer = UniversalVisualizer()
@@ -129,8 +129,9 @@ class BaseSegmentor(BasePredictor):
                 images. Each SegDataSample usually contain:
 
             - ``pred_sem_seg``(PixelData): Prediction of semantic segmentation.
+
             - ``seg_probs``(PixelData): Predicted probs of semantic
-                segmentation after normalization by an activate func.
+                    segmentation after normalization by an activate func.
         """
         batch_img_metas = [
             data_samples.metainfo for data_samples in batch_datasamples
@@ -149,7 +150,7 @@ class BaseSegmentor(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
-                  **kwargs) -> Optional[Union[ndarray, List[ndarray]]]:
+                  **kwargs) -> Optional[Union[np.ndarray, List[np.ndarray]]]:
         """Visualize predictions.
 
         Customize your visualization by overriding this method. visualize
@@ -175,7 +176,8 @@ class BaseSegmentor(BasePredictor):
         visualizations = []
         for img, result in zip(images, results):
             if isinstance(img, Tensor):
-                img = img.detach().cpu().numpy().transpose(1, 2, 0)
+                img = np.ascontiguousarray(
+                    img.detach().cpu().numpy().transpose(1, 2, 0))
             img_name = osp.basename(result.img_path) if 'img_path' in result \
                 else f'{self.num_visualized_imgs:08}.jpg'
             if 'channel_order' in result and result.channel_order != 'rgb':
@@ -188,6 +190,6 @@ class BaseSegmentor(BasePredictor):
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
                 vis_file = osp.join(show_dir, 'vis', img_name)
-                imwrite(drawn_img[..., ::-1], vis_file)
+                imwrite(vis_file, drawn_img[..., ::-1])
             visualizations.append(img)
         return visualizations

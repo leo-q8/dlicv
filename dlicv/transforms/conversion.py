@@ -1,5 +1,5 @@
 from numbers import Number
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import cv2
 import numpy as np
@@ -50,11 +50,11 @@ class ImgToTensor(BaseTransform):
         # for more details
         if not img.flags.c_contiguous:
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
-            img = torch.from_numpy(img).to(self.device).to(self.dtype)
+            img = torch.from_numpy(img).to(self.device)
         else:
             img = torch.from_numpy(img).to(self.device).permute(
-                2, 0, 1).contiguous().to(self.dtype)
-        if self.to_float32:
+                2, 0, 1).contiguous()
+        if self.to_float32 and img.dtype != torch.float32:
             img = img.to(torch.float32)
         results['img'] = img
         return results
@@ -88,8 +88,12 @@ class Normalize(BaseTransform):
         std (sequence): Std values of 3 channels.
     """
     def __init__(self,
-                 mean: Sequence[Number],
-                 std: Sequence[Number]) -> None:
+                 mean: Union[Number, Sequence[Number]],
+                 std: Union[Number, Sequence[Number]]) -> None:
+        if isinstance(mean, (int, float)):
+            mean = [mean]
+        if isinstance(std, (int, float)):
+            std = [std]
         self.mean = list(mean)
         self.std = list(std)
     

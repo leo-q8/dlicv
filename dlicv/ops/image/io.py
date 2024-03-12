@@ -184,14 +184,14 @@ def imread(img_path: Union[str, Path],
         return img
 
 
-def imwrite(img: np.ndarray,
-            file_path: Union[str, Path],
+def imwrite(file_path: Union[str, Path],
+            img: np.ndarray,
             params: Optional[list] = None) -> bool:
     """Write image to file.
 
     Args:
-        img (ndarray): Image array to be written.
         file_path (str): Image file path.
+        img (ndarray): Image array to be written.
         params (None or list): Same as opencv :func:`imwrite` interface.
 
     Returns:

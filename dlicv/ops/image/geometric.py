@@ -325,9 +325,7 @@ def impad(img: ImgType,
                 assert len(pad_val) == img.shape[-1]
             elif img.ndim == 2:
                 assert len(pad_val) == 1
-        elif isinstance(pad_val, Number):
-            assert img.ndim == 2 or img.shape[-1] == 1
-        else:
+        elif not isinstance(pad_val, Number):
             raise TypeError(f'pad_val must be a int or a tuple. when pad with'
                             f'array image. But received {type(pad_val)}')
         img = cv2.copyMakeBorder(
@@ -339,9 +337,6 @@ def impad(img: ImgType,
             cv2_border_modes[padding_mode],
             value=pad_val)
     else:
-        if not isinstance(pad_val, Number):
-            raise TypeError(f'pad_val must be a int or a tuple. when pad with'
-                            f'tensor image. But received {type(pad_val)}')
         img = TF.pad(img, padding, pad_val, padding_mode)
     if return_padding:
         return img, padding

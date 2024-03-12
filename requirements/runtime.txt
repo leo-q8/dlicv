@@ -3,6 +3,7 @@ matplotlib
 numpy
 opencv-python
 prettytable
+rich
 six
 terminaltables
 torch>=1.8.0

@@ -50,8 +50,8 @@ class BackendModel:
                         f'`backend` param manually.')
                 backend = format_backends[file_format]
                 self.logger.info(
-                    f'Automatically specify the `{backend}` backend for '
-                    f'`{Path(backend_files).name}` backend-file.')
+                    f"Automatically specify the `{backend}` backend for "
+                    f"'{Path(backend_files).name}' backend-file.")
             elif isinstance(backend_files, Sequence):
                 raise TypeError(
                     f'Please specify `backend` param manually for `List` ' 
@@ -85,10 +85,12 @@ class BackendModel:
             cast_inputs = []
             for input, input_spec in zip(inputs, self.backend.input_specs):
                 if input.dtype is not None and input.dtype != input_spec.dtype:
-                    WarnOnlyOnce(f"Backend model `{self._name}` requires "
-                                 f"{input_spec.dtype} for input "
-                                 f"`{input_spec.name}`. Cast {input.dtype} "
-                                 f"input to {input_spec.dtype}")
+                    WarnOnlyOnce.warn(
+                        self.logger,
+                        f"Backend model '{self._name}' requires "
+                        f"{input_spec.dtype} for input "
+                        f"`{input_spec.name}`. Cast {input.dtype} "
+                        f"input to {input_spec.dtype}")
                     input = input.to(input_spec.dtype)
                 cast_inputs.append(input)
             inputs = cast_inputs

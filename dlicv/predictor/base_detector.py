@@ -2,7 +2,7 @@ from abc import abstractmethod
 import os.path as osp
 from typing import Any, List, Callable, Optional, Sequence, Tuple, Union
 
-from numpy import ndarray
+import numpy as np
 from torch import Tensor
 
 from dlicv.structures import DetDataSample, InstanceData
@@ -14,7 +14,7 @@ from .base import BasePredictor, ModelType
 
 SampleList = List[DetDataSample]
 InstanceList = List[InstanceData]
-ImgsType = List[Union[ndarray, Tensor]]
+ImgsType = List[Union[np.ndarray, Tensor]]
 
 
 class BaseDetector(BasePredictor):
@@ -85,9 +85,9 @@ class BaseDetector(BasePredictor):
         self.nms_cfg = nms_cfg
         self.max_det = max_det
         if isinstance(classes, str):
-            classes = Classes[classes].value
             if palette is None:
                 palette = classes
+            classes = Classes[classes].value
         self.classes = classes
         self.palette = palette
         self.visualizer = UniversalVisualizer()
@@ -105,7 +105,8 @@ class BaseDetector(BasePredictor):
         Returns:
             bboxes (List[Tensor[N, 4]]): Each item is a Tensor representing 
                 all detection boxes of each image, has a shape 
-                (num_objects, 4). Expected to be in (x1, y1, x2, y2) format.
+                (num_objects, 4). Expected to be (x1, y1, x2, y2) format in 
+                pixel coordinates.
             scores (List[Tensor[N,]]): Each item is a Tensor representing 
                 detection scores corresponding to the detection boxes of
                 each image, has a shape (num_objects, ).
@@ -149,7 +150,7 @@ class BaseDetector(BasePredictor):
                 (x1, y1, x2, y2).
             scores (Tensor[N_post,]): Confidence scores, has a shape 
                 (num_object_post, ).
-            labels (Tensor[N,]): Labels of bboxes, has a shape 
+            labels (Tensor[N_post,]): Labels of bboxes, has a shape 
                 (num_object_post, ).
         """
         # filter low confidence boxes 
@@ -224,7 +225,7 @@ class BaseDetector(BasePredictor):
             data_samples.metainfo for data_samples in batch_datasamples
         ]
         parsed_preds = self._parse_preds(preds, batch_img_metas)
-        for data_sample, cls_socres, bbox_preds, labels, img_meta in \
+        for data_sample, bbox_preds, cls_socres, labels, img_meta in \
                 zip(batch_datasamples, *parsed_preds, batch_img_metas):
 
             bboxes, scores, labels = self.bbox_postprocess(
@@ -242,7 +243,7 @@ class BaseDetector(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
-                  **kwargs) -> Optional[List[ndarray]]:
+                  **kwargs) -> Optional[List[np.ndarray]]:
         """Visualize predictions.
 
         Customize your visualization by overriding this method. visualize
@@ -268,7 +269,8 @@ class BaseDetector(BasePredictor):
         visualizations = []
         for img, result in zip(images, results):
             if isinstance(img, Tensor):
-                img = img.detach().cpu().numpy().transpose(1, 2, 0)
+                img = np.ascontiguousarray(
+                    img.detach().cpu().numpy().transpose(1, 2, 0))
             img_name = osp.basename(result.img_path) if 'img_path' in result \
                 else f'{self.num_visualized_imgs:08}.jpg'
             if 'channel_order' in result and result.channel_order != 'rgb':
@@ -281,6 +283,6 @@ class BaseDetector(BasePredictor):
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
                 vis_file = osp.join(show_dir, 'vis', img_name)
-                imwrite(drawn_img[..., ::-1], vis_file)
+                imwrite(vis_file, drawn_img[..., ::-1])
             visualizations.append(img)
         return visualizations

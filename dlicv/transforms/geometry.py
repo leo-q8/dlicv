@@ -201,4 +201,6 @@ class Pad(BaseTransform):
         return repr_str
         
          
+class CenterCrop(BaseTransform):
+    pass
     

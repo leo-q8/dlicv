@@ -174,6 +174,8 @@ class UniversalVisualizer(Visualizer):
         if 'keypoints' in instances:
             keypoints = instances.get('transformed_keypoints',
                                       instances.keypoints)
+            if isinstance(keypoints, torch.Tensor):
+                keypoints = keypoints.cpu().numpy()
 
             if 'keypoints_visible' in instances:
                 keypoints_visible = instances.keypoints_visible
@@ -284,7 +286,7 @@ class UniversalVisualizer(Visualizer):
             masks = instances.masks
             labels = instances.labels if 'labels' in instances else []
             if isinstance(masks, torch.Tensor):
-                masks = masks.numpy()
+                masks = masks.cpu().numpy()
 
             masks = masks.astype(bool)
 
@@ -456,7 +458,7 @@ class UniversalVisualizer(Visualizer):
             lineType = 2
 
             if isinstance(sem_seg[0], torch.Tensor):
-                masks = sem_seg[0].numpy() == labels[:, None, None]
+                masks = sem_seg[0].cpu().numpy() == labels[:, None, None]
             else:
                 masks = sem_seg[0] == labels[:, None, None]
             masks = masks.astype(np.uint8)
@@ -479,7 +481,7 @@ class UniversalVisualizer(Visualizer):
                                       loc[1] + label_height + baseline), 
                                      (0, 0, 0), rectangleThickness)
                 mask = cv2.putText(mask, text, (loc[0], loc[1] + label_height),
-                                   font, fontScale, text_colors[classes_id], 
+                                   font, fontScale, text_colors[mask_num], 
                                    thickness, lineType)
         color_seg = (image * (1 - self.alpha) + mask * self.alpha).astype(
             np.uint8)
@@ -523,8 +525,8 @@ class UniversalVisualizer(Visualizer):
         #Get adaptive scale according to image shape.
         #The target scale depends on the the short edge length of the image. 
         # If the short edge length equals 224, the output is 1.0.
-        short_edge_length = min(image.shape[:2])
-        img_scale = short_edge_length / 224.
+        long_edge_length = max(image.shape[:2])
+        img_scale = long_edge_length / 224.
         img_scale = min(max(img_scale, 0.3), 3.0)
         text_cfg = {
             'size': int(img_scale * 7),

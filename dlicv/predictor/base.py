@@ -319,7 +319,6 @@ class BasePredictor(metaclass=PredictorMeta):
             list: Prediction results.
         """
    
-    @abstractmethod
     def visualize(self,
                   inputs: InputsType,
                   results: List[BaseDataElement],
@@ -346,6 +345,7 @@ class BasePredictor(metaclass=PredictorMeta):
         Returns:
             List[np.ndarray]: Visualization results.
         """
+        pass
 
     def _dispatch_kwargs(self, **kwargs) -> Tuple[Dict, Dict, Dict, Dict]:
         """Dispatch kwargs to preprocess(), forward(), visualize() and

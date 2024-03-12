@@ -1,7 +1,7 @@
 import os.path as osp
 from typing import List, Callable, Optional, Sequence, Tuple, Union
 
-from numpy import ndarray
+import numpy as np
 from torch import Tensor
 import torch.nn.functional as F
 
@@ -13,7 +13,7 @@ from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
 
 SampleList = List[ClsDataSample]
-ImgsType = List[Union[ndarray, Tensor]]
+ImgsType = List[Union[np.ndarray, Tensor]]
 
 
 class BaseClassifier(BasePredictor):
@@ -113,7 +113,7 @@ class BaseClassifier(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
-                  **kwargs) -> Optional[Union[ndarray, List[ndarray]]]:
+                  **kwargs) -> Optional[Union[np.ndarray, List[np.ndarray]]]:
         """Visualize predictions.
 
         Customize your visualization by overriding this method. visualize
@@ -139,7 +139,8 @@ class BaseClassifier(BasePredictor):
         visualizations = []
         for img, result in zip(images, results):
             if isinstance(img, Tensor):
-                img = img.detach().cpu().numpy().transpose(1, 2, 0)
+                img = np.ascontiguousarray(
+                    img.detach().cpu().numpy().transpose(1, 2, 0))
             img_name = osp.basename(result.img_path) if 'img_path' in result \
                 else f'{self.num_visualized_imgs:08}.jpg'
             if 'channel_order' in result and result.channel_order != 'rgb':
@@ -150,6 +151,6 @@ class BaseClassifier(BasePredictor):
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
                 vis_file = osp.join(show_dir, 'vis', img_name)
-                imwrite(drawn_img[..., ::-1], vis_file)
+                imwrite(vis_file, drawn_img[..., ::-1])
             visualizations.append(img)
         return visualizations
