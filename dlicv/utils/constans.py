@@ -40,9 +40,14 @@ class Classes(Enum):
             'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 
             'scissors', 'teddy bear', 'hair drier', 'toothbrush')
     citys = ()
-    voc = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
-           'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 
-           'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+    voc_det = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
+               'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 
+               'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 
+               'tvmonitor')
+    voc_seg = ('background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 
+               'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 
+               'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 
+               'train', 'tvmonitor')
     imagenet = ('tench, Tinca tinca',
                 'goldfish, Carassius auratus',
                 'great white shark, white shark, man-eater, man-eating shark, Carcharodon carcharias',  # noqa: E501

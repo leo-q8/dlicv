@@ -91,9 +91,9 @@ install_requires = parse_requirements()
 setup(
     name='dlicv',
     version=get_version(),
-    description='a Deep Learning Inference tool box for Computer Vision',
-    url='',
-    author='XueQing Wang',
+    description='Deep Learning Inference kit tool for Computer Vision',
+    url='https://github.com/xueqing888/dlicv.git',
+    author='Wang Xueqing',
     author_email='870530576@qq.com',
     packages=find_packages(),
     include_package_data=True,

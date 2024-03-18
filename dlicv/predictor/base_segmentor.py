@@ -150,6 +150,7 @@ class BaseSegmentor(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
+                  show_labels: bool = True,
                   **kwargs) -> Optional[Union[np.ndarray, List[np.ndarray]]]:
         """Visualize predictions.
 
@@ -185,7 +186,8 @@ class BaseSegmentor(BasePredictor):
             drawn_img = self.visualizer.draw_sem_seg(img, 
                                                      result.pred_sem_seg,
                                                      classes=self.classes,
-                                                     palette=self.palette)
+                                                     palette=self.palette,
+                                                     show_labels=show_labels)
             if show:
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:
