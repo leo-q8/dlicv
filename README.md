@@ -1,3 +1,14 @@
+<div align="center">
+    <b><font size="5">DLICV: Deep Learning Inference kit tool for Computer Vision</font></b>
+    
+![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)
+![Static Badge](https://img.shields.io/badge/python-3.7%2B-blue.svg)
+![Static Badge](https://img.shields.io/badge/pytorch-1.8%2B-orange)
+
+</div>
+
+
+
 ## 简介
 DLICV是一个基于PyTorch开发，用于在计算机视觉任务中进行深度学习推理的python库。针对不同的硬件平台和推理后端，它供了深度学习模型推理的统一接口，屏蔽了不同推理后端的诸多使用细节诸如资源申请释放、数据搬运等。DLICV将常见计算机视觉基础任务的深度学习推理过程抽象为数据前处理、后端模型推理、预测结果后处理和推理结果可视化，并将上述流程封装在基础预测器中实现端到端的推理过程，避免重复编写繁琐的推理脚本。上述特性使得DLICV可以在不同平台上针对不同任务提供一致和便捷的深度学习模型推理体验。
 ## 主要特性(Main Features)
@@ -110,7 +121,7 @@ res = classifier(filename, show_dir='./') #
 <details>
 <summary>使用BaseDetector实现目标检测任务的端到端推理</summary>
 
-我们以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方给的[模型导出教程]()来获取你想要的后端模型
+以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方给的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx后端模型推理为例
 
 ```python
 import urllib.resuest
@@ -124,7 +135,7 @@ url, filename = ("https://ultralytics.com/images/bus.jpg", "bus.jpg")
 urllib.request.urlretrieve(url, filename)
 
 # Build BackendModel.
-backend_model_file = '/path/to/backend model/file'
+backend_model_file = '/path/to/onnx-model/yolov8n.onnx'
 backend_model = BackendModel(backend_model_file)
 
 # Build data pipeline for image preprocessing with `dlicv.transforms`
