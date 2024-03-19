@@ -1,9 +1,10 @@
 <div align="center">
-    <b><font size="5">DLICV: Deep Learning Inference kit tool for Computer Vision</font></b>
-    
+
+# DLICV: Deep Learning Inference kit tool for Computer Vision
+
 ![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)
-![Static Badge](https://img.shields.io/badge/python-3.7%2B-blue.svg)
-![Static Badge](https://img.shields.io/badge/pytorch-1.8%2B-orange)
+![Static Badge](https://img.shields.io/badge/Python-3.7%2B-blue)
+![Static Badge](https://img.shields.io/badge/PyTorch-1.8%2B-orange)
 
 </div>
 
@@ -28,7 +29,9 @@ The supported Device-InferenceBackend matrix is presented as following,
 
 
 ### 端到端的推理流程
+
 DLICV实现的`BasePredictor`提供了端到端的推理体验，它将常见的计算机视觉基础任务中的深度学习推理过程分解为四个核心环节：数据预处理、后端模型推理、预测结果后处理和推理结果可视化。通过将这四个环节整合到一个基础预测器中，DLICV避免了开发者需要重复编写复杂且繁琐的推理脚本，从而提高开发效率。
+
 ### 提供同时支持`np.ndarry`和`torch.Tenosr`的多种常用的图像、边界框处理函数
 - [图像处理](): `imresize`, `impad`, `imcrop`, `imrotate`
 - [图像变换](): `LoadImage`, `Resize`, `Pad`, `ImgToTensor`
@@ -37,7 +40,7 @@ DLICV实现的`BasePredictor`提供了端到端的推理体验，它将常见的
 ## 安装(Installation)
 安装DLICV和基础依赖包
 ```bash
-pip install git+https://github.com/avril-wang1214/dlicv.git
+pip install git+https://github.com/xueqing888/dlicv.git
 ```
 <details>
 <summary>为了实现多平台推理，需要安装相应推理后端及所提供的Python SDK</summary>
@@ -114,14 +117,18 @@ classifier = BaseClassifier(model, data_pipeline, classes='imagenet')
 res = classifier(filename, show_dir='./') # 
 ```
 成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`dog.jpg`的可视化结果图像如下所示
-<img src="figures/dog.jpg">
+
+<div align="center">
+<img src="figures/dog.jpg" height = 400>
+<p></p>
+</div>
 
 </details>
 
 <details>
 <summary>使用BaseDetector实现目标检测任务的端到端推理</summary>
 
-以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方给的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx后端模型推理为例
+以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx模型推理为例
 
 ```python
 import urllib.resuest
@@ -174,7 +181,11 @@ detector = YOLOv8(backend_model,
 res = detector(filename, show_dir='.') 
 ```
 成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`bus.jpg`的可视化结果图像如下所示
-<img src="figures/bus.jpg">
+
+<div align="center">
+<img src="figures/bus.jpg" height = 400>
+<p></p>
+</div>
 
 </details>
 
@@ -193,14 +204,14 @@ from dlicv.transforms import *
 # Download an example image from the pytorch website
 url, filename = ("https://github.com/pytorch/hub/raw/master/images/deeplab1.png", "deeplab1.png")
 urllib.request.urlretrieve(url, filename)
+
 # Build DeepLabv3 with pretrained weights from torchvison.
 model = deeplabv3_resnet101(weights=DeepLabV3_ResNet101_Weights)
 model.eval().cuda()
 
+# Build data pipeline for image preprocessing with `dlicv.transforms`
 MEAN = [123.675, 116.28, 103.53]
 STD = [58.395, 57.12, 57.375]
-
-# Build data pipeline for image preprocessing with `dlicv.transforms`
 data_pipeline = Compose([
    LoadImage(channel_order='rgb', to_tensor=True, device='cuda'),
    Normalize(mean=MEAN, std=STD),
@@ -213,12 +224,15 @@ class DeepLabv3(BaseSegmentor):
         pred_seg_maps = preds['out']
         return super().postprocess(pred_seg_maps, *args, ** kwargs)
 
-
 segmentor = DeepLabv3(model, data_pipeline, classes='voc_seg')
 res = segmentor(filename, show_dir='./')
 ```
 成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`deeplab1.png`的可视化结果图像如下所示
-<img src="figures/deeplab1.png">
+
+<div align="center">
+<img src="figures/deeplab1.png" height = 400>
+<p></p>
+</div>
 
 </details>
 
