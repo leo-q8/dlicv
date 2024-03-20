@@ -2,7 +2,7 @@
 
 # DLICV: Deep Learning Inference kit tool for Computer Vision
 
-![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)
+[![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)](https://github.com/xueqing888/dlicv/blob/master/LICENSE)
 ![Static Badge](https://img.shields.io/badge/Python-3.7%2B-blue)
 ![Static Badge](https://img.shields.io/badge/PyTorch-1.8%2B-orange)
 
@@ -30,7 +30,7 @@ The supported Device-InferenceBackend matrix is presented as following,
 
 ### 端到端的推理流程
 
-DLICV实现的`BasePredictor`提供了端到端的推理体验，它将常见的计算机视觉基础任务中的深度学习推理过程分解为四个核心环节：数据预处理、后端模型推理、预测结果后处理和推理结果可视化。通过将这四个环节整合到一个基础预测器中，DLICV避免了开发者需要重复编写复杂且繁琐的推理脚本，从而提高开发效率。
+DLICV实现的[`BasePredictor`](https://github.com/xueqing888/dlicv/blob/348d47426caff5414c7cf881b43c15308e09e879/dlicv/predictor/base.py#L70)提供了端到端的推理体验，它将常见的计算机视觉基础任务中的深度学习推理过程分解为四个核心环节：数据预处理、后端模型推理、预测结果后处理和推理结果可视化。通过将这四个环节整合到一个基础预测器中，DLICV避免了开发者需要重复编写复杂且繁琐的推理脚本，从而提高开发效率。
 
 ### 提供同时支持`np.ndarry`和`torch.Tenosr`的多种常用的图像、边界框处理函数
 - [图像处理](): `imresize`, `impad`, `imcrop`, `imrotate`
@@ -60,7 +60,7 @@ pip install git+https://github.com/xueqing888/dlicv.git
 <details>
 <summary>后端模型推理</summary>
 
-DLICV实现的`BackendModel`支持多种推理后端模型的推理。使用起来也非常简单，传入相应的后端模型文件、设备类型（可选）等参数构建一个可调用**后端模型**对象。传入`torch.Tensor`数据就可进行推理，获取推理结果。
+DLICV实现的[`BackendModel`](https://github.com/xueqing888/dlicv/blob/348d47426caff5414c7cf881b43c15308e09e879/dlicv/backend/backend_model.py#L20)支持多种推理后端模型的推理。使用起来也非常简单，传入相应的后端模型文件、设备类型（可选）等参数构建一个可调用**后端模型**对象。传入`torch.Tensor`数据就可进行推理，获取推理结果。
 
 ```python
 import dlicv
@@ -81,9 +81,9 @@ trt_pred = trt_model(X, force_cast=True)
 </details>
 
 <details>
-<summary>使用BaseClassifier实现图像识别任务的端到端推理</summary>
+<summary> 使用<code>BaseClassifier</code>实现图像识别任务的端到端推理 </summary>
 
-以[Resnet18](https://pytorch.org/vision/stable/models/resnet.html#resnet)的推理为例介绍`BaseClassifier`的使用
+以[Resnet18](https://pytorch.org/vision/stable/models/resnet.html#resnet)的推理为例介绍[`BaseClassifier`](https://github.com/xueqing888/dlicv/blob/348d47426caff5414c7cf881b43c15308e09e879/dlicv/predictor/base_classifier.py#L19)的使用
 
 ```python
 import urllib.request
@@ -126,9 +126,9 @@ res = classifier(filename, show_dir='./') #
 </details>
 
 <details>
-<summary>使用BaseDetector实现目标检测任务的端到端推理</summary>
+<summary>使用<code>BaseDetector</code>实现目标检测任务的端到端推理</summary>
 
-以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx模型推理为例
+以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍[`BaseDetector`](https://github.com/xueqing888/dlicv/blob/348d47426caff5414c7cf881b43c15308e09e879/dlicv/predictor/base_detector.py#L20)的使用</br>可以参考`YOLOv8`官方的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx模型推理为例
 
 ```python
 import urllib.resuest
@@ -190,9 +190,9 @@ res = detector(filename, show_dir='.')
 </details>
 
 <details>
-<summary>使用BaseSegmentor实现语义分割任务的端到端推理</summary>
+<summary>使用<code>BaseSegmentor</code>实现语义分割任务的端到端推理</summary>
 
-以语义分割模型[DeepLabV3](https://pytorch.org/vision/stable/models/deeplabv3.html#deeplabv3)的推理为例介绍`BaseSegmentor`的使用
+以语义分割模型[DeepLabV3](https://pytorch.org/vision/stable/models/deeplabv3.html#deeplabv3)的推理为例介绍[`BaseSegmentor`](https://github.com/xueqing888/dlicv/blob/348d47426caff5414c7cf881b43c15308e09e879/dlicv/predictor/base_segmentor.py#L18)的使用
 
 ```python
 import urllib.request
