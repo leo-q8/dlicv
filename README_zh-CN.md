@@ -8,18 +8,14 @@
 
 </div>
 
-<div align="center">
-
-English | [简体中文](README_zh-CN.md)
-
-</div>
 
 
-## Introduction
-DLICV is a Python library developed based on PyTorch for deep learning inference in computer vision tasks. It provides a unified interface for deep learning model inference across different hardware platforms and inference backends, abstracting away many usage details such as resource allocation and release, data movement, etc. DLICV abstracts the deep learning inference process for common computer vision tasks into data preprocessing, backend model inference, post-prediction processing, and inference result visualization. These processes are encapsulated in the basic predictor to realize an end-to-end inference process, avoiding the need for repetitive and cumbersome inference scripting. These features enable DLICV to offer a consistent and convenient deep learning model inference experience for different computer vision tasks on various platforms.
-## Main Features
-### Multipe hardware platforms and inference backends are available
-The supported Device-InferenceBackend matrix is presented as following, and more will be compatible.
+## 简介
+DLICV是一个基于PyTorch开发，用于在计算机视觉任务中进行深度学习推理的python库。针对不同的硬件平台和推理后端，它供了深度学习模型推理的统一接口，屏蔽了不同推理后端的诸多使用细节诸如资源申请释放、数据搬运等。DLICV将常见计算机视觉基础任务的深度学习推理过程抽象为数据前处理、后端模型推理、预测结果后处理和推理结果可视化，并将上述流程封装在基础预测器中实现端到端的推理过程，避免重复编写繁琐的推理脚本。上述特性使得DLICV可以在不同平台上针对不同任务提供一致和便捷的深度学习模型推理体验。
+## 主要特性
+### 支持多种硬件平台和推理后端
+支持的硬件平台和推理后端如下表所示
+The supported Device-InferenceBackend matrix is presented as following,
 
 | Device / <br> Inference Backend | [ONNX Runtime](https://github.com/microsoft/onnxruntime) | [TensorRT](https://github.com/NVIDIA/TensorRT) | [OpenVINO](https://github.com/openvinotoolkit/openvino) | [ncnn](https://github.com/Tencent/ncnn) | [CANN](https://www.hiascend.com/software/cann) | [CoreML](https://github.com/apple/coremltools) |
 | :-----------------------------: | :------------------------------------------------------: | :--------------------------------------------: | :-----------------------------------------------------: | :-------------------------------------: | :--------------------------------------------: | :--------------------------------------------: |
@@ -32,37 +28,39 @@ The supported Device-InferenceBackend matrix is presented as following, and more
 |            Apple M1             |                                                          |                                                |                                                         |                    ✅                    |                                                |                       ✅                        |
 
 
-### End-to-end inference process
-The `BasePredictor` implemented by DLICV offers an end-to-end inference experience, breaking down the deep learning inference process in common computer vision tasks into four core stages: data preprocessing, backend model inference, post-prediction processing, and inference result visualization. By integrating these four stages into a single basic predictor, DLICV eliminates the need for developers to repeatedly write complex and cumbersome inference scripts, thus enhancing development efficiency.
-### Image/bounding box processing support both `np.ndarray` and `torch.Tensor`
-- [Image processing](): `imresize`, `impad`, `imcrop`, `imrotate`
-- [Image transformation](): `LoadImage`, `Resize`, `Pad`, `ImgToTensor`
-- [Bounding box processing](): `clip_boxes`, `resize_boxes`, `box_iou`, `batched_nms`
+### 端到端的推理流程
 
-## Installation
-Install DLICV and its basic dependencies:
+DLICV实现的`BasePredictor`提供了端到端的推理体验，它将常见的计算机视觉基础任务中的深度学习推理过程分解为四个核心环节：数据预处理、后端模型推理、预测结果后处理和推理结果可视化。通过将这四个环节整合到一个基础预测器中，DLICV避免了开发者需要重复编写复杂且繁琐的推理脚本，从而提高开发效率。
+
+### 提供同时支持`np.ndarry`和`torch.Tenosr`的多种常用的图像、边界框处理函数
+- [图像处理](): `imresize`, `impad`, `imcrop`, `imrotate`
+- [图像变换](): `LoadImage`, `Resize`, `Pad`, `ImgToTensor`
+- [边界框处理](): `clip_boxes`, `resize_boxes`, `box_iou`, `batched_nms`
+
+## 安装
+安装DLICV和基础依赖包
 ```bash
 pip install git+https://github.com/xueqing888/dlicv.git
 ```
 <details open>
-<summary>Install the corresponding inference backend for multi-platform inference</summary>
+<summary>为了实现多平台推理，需要安装相应推理后端及所提供的Python SDK</summary>
 
-|    NAME     | INSTALLATION                                                     |
+|    名称     | 安装说明                                                     |
 | :---------: | :----------------------------------------------------------- |
-| ONNXRuntime | [ONNX Runtime official docs](https://onnxruntime.ai/docs/get-started/with-python.html#install-onnx-runtime) offers two Python packages for ONNX Runtime. Only one of these packages should be installed at a time in any one environment. <br />If your platform has CUDA-enabled GPU hardware, we recommend installing the GPU version package, which encompasses most of the CPU functionality.<br /><pre> `pip install onnxruntime-gpu`</pre>Use the CPU package if you are running on Arm CPUs and/or macOS.<br /><pre>`pip install onnxruntime`</pre> |
-|  TensorRT   | First, ensure that your platform has the appropriate CUDA version of GPU drivers installed, which can be checked using the `nvidia-smi` command.<br />Then, you can install TensorRT by using the precompiled Python package provided by the [TensorRT repository](https://github.com/NVIDIA/TensorRT?tab=readme-ov-file#prebuilt-tensorrt-python-package)<br /><pre>`pip install tensorrt`</pre> |
-|  OpenVINO   | Install  [OpenVINO](https://docs.openvino.ai/2021.4/get_started.html) package<br /><pre>`pip install openvino-dev`</pre> |
-|    ncnn     | 1. Download and build ncnn according to its <a href="https://github.com/Tencent/ncnn/wiki/how-to-build">wiki</a>. Make sure to enable <code>-DNCNN_PYTHON=ON</code> in your build command.<br/>2. Export ncnn's root path to environment variable<br/><pre>`cd ncnn`<br />`export NCNN_DIR=$(pwd)`</pre>3. Install pyncnn<br><pre>`cd ${NCNN_DIR}/python`<br/>`pip install -e .`</pre> |
-|   Ascend    | 1.Install CANN follow [official guide](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/60RC1alpha02/softwareinstall/instg/atlasdeploy_03_0002.html).<br/>2. Setup environment<br/>   <pre>`export ASCEND_TOOLKIT_HOME="/usr/local/Ascend/ascend-toolkit/latest"`</pre> |
+| ONNXRuntime | [ONNX Runtime官方文档](https://onnxruntime.ai/docs/get-started/with-python.html#install-onnx-runtime)中提供了GPU和CPU两个版本的Python包安装方式。在任何一个环境中，一次只能安装其中一个包。<br />如果你的平台上有支持CUDA的GPU硬件，推荐GPU版本的安装包，它同时包含了绝大部分CPU版本的功能<br /><pre> `pip install onnxruntime-gpu`</pre>如果要在ARM CPU或者macOS上运行，请安装CPU版本的Python包<br /><pre>`pip install onnxruntime`</pre> |
+|  TensorRT   | 首先确认你的平台上安装有合适的CUDA 版本的GPU驱动，可以通过`nivdia-smi`指令查看。<br />然后可以通过安装[TensorRT官方](https://github.com/NVIDIA/TensorRT?tab=readme-ov-file#prebuilt-tensorrt-python-package)提供的预编译Python包来安装TensorRT<br /><pre>`pip install tensorrt`</pre> |
+|  OpenVINO   | 安装 [OpenVINO](https://docs.openvino.ai/2021.4/get_started.html)<br /><pre>`pip install openvino-dev`</pre> |
+|    ncnn     | 1. 请参考 ncnn的 <a href="https://github.com/Tencent/ncnn/wiki/how-to-build">wiki</a> 编译 ncnn。编译时，请打开<code>-DNCNN_PYTHON=ON</code><br/>2. 将 ncnn 的根目录写入环境变量<br/><pre>`cd ncnn`<br />`export NCNN_DIR=$(pwd)`</pre>3. 安装 pyncnn<br><pre>`cd ${NCNN_DIR}/python`<br/>`pip install -e .`</pre> |
+|   Ascend    | 1. 按照[官方指引](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/60RC1alpha02/softwareinstall/instg/atlasdeploy_03_0002.html)安装 CANN 工具集.<br/>2. 配置环境<br/>   <pre>`export ASCEND_TOOLKIT_HOME="/usr/local/Ascend/ascend-toolkit/latest"`</pre> |
 
 </details>
 
-## Get started
+## 快速上手
 
 <details open>
-<summary>Backend model inference</summary>
+<summary>后端模型推理</summary>
 
-The `BackendModel` implemented in DLICV supports inference for multiple backend models. It's straightforward to use: simply pass the relevant backend model file, device type (optional), and other parameters to construct a callable **backend-model** object. You can then perform inference and obtain the results by passing `torch.Tensor` data.
+DLICV实现的`BackendModel`支持多种推理后端模型的推理。使用起来也非常简单，传入相应的后端模型文件、设备类型（可选）等参数构建一个可调用**后端模型**对象。传入`torch.Tensor`数据就可进行推理，获取推理结果。
 
 ```python
 import dlicv
@@ -83,9 +81,10 @@ trt_pred = trt_model(X, force_cast=True)
 </details>
 
 <details open>
-<summary>Perform end-to-end inference for image classification tasks with <code>BaseClassifier</code>.</summary>
+<summary>使用<code>BaseClassifier</code>实现图像识别任务的端到端推理</summary>
 
-Let's illustrate the usage of `BaseClassifier` with an example of [ResNet18](https://pytorch.org/vision/stable/models/resnet.html#resnet) inference.
+以[Resnet18](https://pytorch.org/vision/stable/models/resnet.html#resnet)的推理为例介绍`BaseClassifier`的使用
+
 ```python
 import urllib.request
 
@@ -117,7 +116,7 @@ data_pipeline = Compose([
 classifier = BaseClassifier(model, data_pipeline, classes='imagenet')
 res = classifier(filename, show_dir='./') # 
 ```
-After successfully running the above code, a directory named `vis` will be created in the current working directory. In this directory, there will be a visualization result image named `dog.jpg` as shown below.
+成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`dog.jpg`的可视化结果图像如下所示
 
 <div align="center">
 <img src="figures/dog.jpg" height = 400>
@@ -127,9 +126,9 @@ After successfully running the above code, a directory named `vis` will be creat
 </details>
 
 <details open>
-<summary>Perform end-to-end inference for objectj detection tasks with <code>BaseDetector</code>.</summary>
+<summary>使用<code>BaseDetector</code>实现目标检测任务的端到端推理</summary>
 
-As an example, let's illustrate the usage of `BaseDetector` with object detection model [YOLOv8](https://github.com/ultralytics/ultralytics). You can refer to the official [model export tutorial](https://docs.ultralytics.com/modes/export) to obtain the backend model you need. Here, we'll demonstrate inference with the onnx model of `yolov8n`
+以目标检测模型[YOLOv8](https://github.com/ultralytics/ultralytics)的推理为例介绍`BaseDetector`的使用</br>可以参考`YOLOv8`官方的[模型导出教程](https://docs.ultralytics.com/modes/export)来获取你想要的后端模型，这里我们以yolov8n的onnx模型推理为例
 
 ```python
 import urllib.resuest
@@ -181,8 +180,7 @@ detector = YOLOv8(backend_model,
                   classes='coco')
 res = detector(filename, show_dir='.') 
 ```
-
-After successfully running the above code, a directory named `vis` will be created in the current working directory. In this directory, there will be a visualization result image named `bus.jpg` as shown below.
+成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`bus.jpg`的可视化结果图像如下所示
 
 <div align="center">
 <img src="figures/bus.jpg" height = 400>
@@ -192,9 +190,9 @@ After successfully running the above code, a directory named `vis` will be creat
 </details>
 
 <details open>
-<summary>Perform end-to-end inference for semantic segmentation tasks with <code>BaseSegmentor</code></summary>
+<summary>使用<code>BaseSegmentor</code>实现语义分割任务的端到端推理</summary>
 
-Let's illustrate the usage of BaseSegmentor with an example of inference using the semantic segmentation model [DeepLabV3](https://pytorch.org/vision/stable/models/deeplabv3.html#deeplabv3).
+以语义分割模型[DeepLabV3](https://pytorch.org/vision/stable/models/deeplabv3.html#deeplabv3)的推理为例介绍`BaseSegmentor`的使用
 
 ```python
 import urllib.request
@@ -229,8 +227,7 @@ class DeepLabv3(BaseSegmentor):
 segmentor = DeepLabv3(model, data_pipeline, classes='voc_seg')
 res = segmentor(filename, show_dir='./')
 ```
-
-After successfully running the above code, a directory named `vis` will be created in the current working directory. In this directory, there will be a visualization result image named `deeplab1.jpg` as shown below.
+成功运行上述代码后会在当前工作目录下生成`vis`目录，该目录下有一张名为`deeplab1.png`的可视化结果图像如下所示
 
 <div align="center">
 <img src="figures/deeplab1.png" height = 400>
@@ -239,14 +236,14 @@ After successfully running the above code, a directory named `vis` will be creat
 
 </details>
 
-## License
-This project is released under the [Apache 2.0 license](LICENSE).
-## Acknowledgement
+## 开源许可证
+该项目采用 [Apache 2.0](LICENSE) 开源许可协证
+## 致谢
 - [MMEngine](https://github.com/open-mmlab/mmengine): OpenMMLab foundational library for training deep learning models.
 - [MMCV](https://github.com/open-mmlab/mmcv): OpenMMLab foundational library for computer vision.
 - [MMDeploy](https://github.com/open-mmlab/mmdeploy): OpenMMLab model deployment framework.
-## Citation
-If you find this project useful in your research, please consider citing:
+## 引用
+如果您在研究中使用了本项目的代码，请参考如下 bibtex 引用 DLICV:
 
 ```BibTeX
 @misc{=dlicv,
