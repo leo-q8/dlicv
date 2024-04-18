@@ -2,7 +2,7 @@
 
 # DLICV: Deep Learning Inference kit tool for Computer Vision
 
-![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)
+[![Static Badge](https://img.shields.io/badge/LICENSE-Apach--2.0-brightgreen)](https://github.com/xueqing888/dlicv/blob/master/LICENSE)
 ![Static Badge](https://img.shields.io/badge/Python-3.7%2B-blue)
 ![Static Badge](https://img.shields.io/badge/PyTorch-1.8%2B-orange)
 
