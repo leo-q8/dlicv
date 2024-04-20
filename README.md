@@ -14,9 +14,14 @@ English | [简体中文](README_zh-CN.md)
 
 </div>
 
-
-## Introduction
 DLICV is a Python library developed based on PyTorch for deep learning inference in computer vision tasks. It provides a unified interface for deep learning model inference across different hardware platforms and inference backends, abstracting away many usage details such as resource allocation and release, data movement, etc. DLICV abstracts the deep learning inference process for common computer vision tasks into data preprocessing, backend model inference, post-prediction processing, and inference result visualization. These processes are encapsulated in the basic predictor to realize an end-to-end inference process, avoiding the need for repetitive and cumbersome inference scripting. These features enable DLICV to offer a consistent and convenient deep learning model inference experience for different computer vision tasks on various platforms.
+
+<div align="center">
+
+<img src="figures/workflow.svg" >
+
+</div>
+
 ## Main Features
 ### Multipe hardware platforms and inference backends are available
 The supported Device-InferenceBackend matrix is presented as following, and more will be compatible.
