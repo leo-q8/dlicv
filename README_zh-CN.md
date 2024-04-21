@@ -12,7 +12,7 @@ DLICV是一个基于PyTorch开发，用于在计算机视觉任务中进行深�
 
 <div align="center">
 
-<img src="figures/dlicv_workflow.svg" >
+<img src="figures/dlicv_workflow.png" >
 
 </div>
 
