@@ -18,7 +18,7 @@ DLICV is a Python library developed based on PyTorch for deep learning inference
 
 <div align="center">
 
-<img src="figures/dlicv_workflow.svg" >
+<img src="figures/dlicv_workflow.png" >
 
 </div>
 
