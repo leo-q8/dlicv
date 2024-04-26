@@ -11,6 +11,8 @@ from dlicv.utils.timer import TimeCounter
 from ..base.base_backend import BackendIOSpec, BaseBackend
 from .torch_allocator import TorchAllocator
 
+TRT_VERSION = int(trt.__version__.split(".")[0]) 
+    
 
 def torch_dtype_from_trt(dtype: trt.DataType) -> torch.dtype:
     """Convert pytorch dtype to TensorRT dtype.
@@ -69,6 +71,7 @@ class TRTBackend(BaseBackend):
 
     def __init__(self, engine_file: str, device_id: int = 0):
         self.torch_device = torch.device('cuda', device_id)
+        self.execute_stream = torch.cuda.Stream()
         self.allocator = TorchAllocator(device_id)
         with trt.Logger() as logger, trt.Runtime(logger) as runtime:
             with open(engine_file, mode='rb') as f:
@@ -84,38 +87,66 @@ class TRTBackend(BaseBackend):
         
         input_specs, output_specs = [], []
         profile_id = 0
-        for input_name in self._input_names:
-            index = self.engine.get_binding_index(input_name)
-            dtype = torch_dtype_from_trt(
-                self.engine.get_binding_dtype(input_name)) 
-            shape = tuple(self.context.get_binding_shape(index))
-            if -1 in shape:
-                profile_shape = self.engine.get_profile_shape(profile_id,
-                                                              input_name)
-                shape = {'min': profile_shape[0], 
-                         'opt': profile_shape[1],
-                         'max': profile_shape[2]}
+        for input_name_idx in self._input_names_idxs:
+            input_name = input_name_idx['name']
+            index = input_name_idx['idx']
+            if TRT_VERSION >= 10:
+                dtype = torch_dtype_from_trt(
+                    self.engine.get_tensor_dtype(input_name))
+                shape = tuple(self.engine.get_tensor_shape(input_name))
+                if -1 in shape: # dynamic input
+                    profile_shape = self.engine.get_tensor_profile_shape(
+                        input_name, profile_id)
+                    shape = {'min': profile_shape[0], 
+                             'opt': profile_shape[1],
+                             'max': profile_shape[2]}
+            else:
+                dtype = torch_dtype_from_trt(
+                    self.engine.get_binding_dtype(input_name)) 
+                shape = tuple(self.engine.get_binding_shape(index))
+                if -1 in shape: # dynamic input
+                    profile_shape = self.engine.get_profile_shape(profile_id,
+                                                                  input_name)
+                    shape = {'min': profile_shape[0], 
+                             'opt': profile_shape[1],
+                             'max': profile_shape[2]}
             input_specs.append(
                 BackendIOSpec(index, input_name, shape, dtype))
 
-        for output_name in self._output_names:
-            index = self.engine.get_binding_index(output_name)
-            dtype = torch_dtype_from_trt(
-                self.engine.get_binding_dtype(output_name)) 
-            shape = tuple(self.context.get_binding_shape(index))
+        for output_name_idx in self._output_names_idxs:
+            output_name = output_name_idx['name']
+            index = output_name_idx['idx']
+            if TRT_VERSION >= 10:
+                dtype = torch_dtype_from_trt(
+                    self.engine.get_tensor_dtype(output_name)) 
+                shape = tuple(self.engine.get_tensor_shape(output_name))
+            else:
+                dtype = torch_dtype_from_trt(
+                    self.engine.get_binding_dtype(output_name)) 
+                shape = tuple(self.context.get_binding_shape(index))
             output_specs.append(
                 BackendIOSpec(index, output_name, shape, dtype))
         super().__init__([engine_file], input_specs, output_specs)
     
     def __load_io_names(self):
         """Load input/output names from engine."""
-        input_names, output_names = [], []
-        for binding in self.engine:
-            if self.engine.binding_is_input(binding):
-                input_names.append(binding)
-            else:
-                output_names.append(binding)
-        self._input_names, self._output_names = input_names, output_names
+        input_names_idxs, output_names_idxs = [], []
+        if TRT_VERSION >= 10:
+            for i in range(self.engine.num_io_tensors):
+                name = self.engine.get_tensor_name(i)
+                if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                    input_names_idxs.append({'name': name, 'idx': i})
+                else:
+                    output_names_idxs.append({'name': name, 'idx': i})
+        else:
+            for i in range(self.engine.num_bindings):
+                name = self.engine.get_binding_name(i)
+                if self.engine.binding_is_input(name):
+                    input_names_idxs.append({'name': name, 'idx': i})
+                else:
+                    output_names_idxs.append({'name': name, 'idx': i})
+        self._input_names_idxs = input_names_idxs
+        self._output_names_idxs = output_names_idxs
 
     def _infer(self, inputs: Sequence[Tensor]) -> Dict[str, Tensor]:
         """Do inference.
@@ -126,19 +157,25 @@ class TRTBackend(BaseBackend):
             Dict[str, torch.Tensor]: The output name and tensor pairs.
         """
         # Make self the active context, pushing it on top of the context stack.
-        bindings = [None] * (len(self._input_names) + len(self._output_names))
+        bindings = [None] * (len(self._input_names_idxs) + 
+                             len(self._output_names_idxs))
         profile_id = 0
         for input_spec, input_tensor in zip(self._input_specs, inputs):
             index, name, _, dtype = input_spec
-            profile = self.engine.get_profile_shape(profile_id, name)
+            if TRT_VERSION >= 10:
+                profile_shape = self.engine.get_tensor_profile_shape(
+                    name, profile_id)
+            else:
+                profile_shape = self.engine.get_profile_shape(profile_id, name)
             # check if input shape is valid
             assert input_tensor.ndim == len(
-                profile[0]), 'Input dim is different from engine profile.'
-            for s_min, s_input, s_max in zip(profile[0], input_tensor.shape, 
-                                             profile[2]):
+                profile_shape[0]), 'Input dim is different from engine profile.'
+            for s_min, s_input, s_max in zip(profile_shape[0], 
+                                             input_tensor.shape, 
+                                             profile_shape[2]):
                 assert s_min <= s_input <= s_max, \
                     'Input shape should be between ' \
-                    + f"{profile[0]} and {profile[2]}" \
+                    + f"{profile_shape[0]} and {profile_shape[2]}" \
                     + f' but get {tuple(input_tensor.shape)}.'
 
             if input_tensor.dtype == torch.long:
@@ -147,16 +184,29 @@ class TRTBackend(BaseBackend):
             assert input_tensor.dtype == dtype, \
                 f'Require {dtype} for `{name}`, but get {input_tensor.dtype}.'
             input_tensor = input_tensor.to(self.torch_device)
-            self.context.set_binding_shape(index, tuple(input_tensor.shape))
-            bindings[index] = input_tensor.contiguous().data_ptr()
+            binding = input_tensor.contiguous().data_ptr()
+            if TRT_VERSION >= 10:
+                self.context.set_input_shape(name, tuple(input_tensor.shape))
+                self.context.set_tensor_address(name, binding)
+            else:
+                self.context.set_binding_shape(
+                    index, tuple(input_tensor.shape))
+            bindings[index] = binding
             
         # Collect output array
         outputs = {}
         for output_spec in self._output_specs:
             index, name, _, dtype = output_spec
-            device = torch_device_from_trt(self.engine.get_location(index))
-            shape = tuple(self.context.get_binding_shape(index))
-            output = torch.empty(size=shape, dtype=dtype, device=device)
+            if TRT_VERSION >= 10:
+                device = torch_device_from_trt(
+                    self.engine.get_tensor_location(name))
+                shape = tuple(self.context.get_tensor_shape(name))
+                output = torch.empty(size=shape, dtype=dtype, device=device)
+                self.context.set_tensor_address(name, output.data_ptr())
+            else:
+                device = torch_device_from_trt(self.engine.get_location(index))
+                shape = tuple(self.context.get_binding_shape(index))
+                output = torch.empty(size=shape, dtype=dtype, device=device)
             outputs[name] = output
             bindings[index] = output.data_ptr()
 
@@ -171,5 +221,8 @@ class TRTBackend(BaseBackend):
         Args:
             bindings (list[int]): A list of integer binding the input/output.
         """
-        self.context.execute_async_v2(bindings,
-                                      torch.cuda.current_stream().cuda_stream)
+        if TRT_VERSION >= 10:
+            self.context.execute_async_v3(self.execute_stream.cuda_stream)
+        else: 
+            self.context.execute_async_v2(bindings, 
+                                          self.execute_stream.cuda_stream)
