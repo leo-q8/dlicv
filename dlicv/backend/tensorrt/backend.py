@@ -71,7 +71,7 @@ class TRTBackend(BaseBackend):
 
     def __init__(self, engine_file: str, device_id: int = 0):
         self.torch_device = torch.device('cuda', device_id)
-        self.execute_stream = torch.cuda.Stream()
+        self.stream = torch.cuda.Stream(self.torch_device)
         self.allocator = TorchAllocator(device_id)
         with trt.Logger() as logger, trt.Runtime(logger) as runtime:
             with open(engine_file, mode='rb') as f:
@@ -213,6 +213,8 @@ class TRTBackend(BaseBackend):
         # Run inference.
         self.__trt_execute(bindings=bindings)
 
+        self.stream.synchronize()
+
         return outputs
 
     @TimeCounter.count_time(Backend.TENSORRT.value)
@@ -222,7 +224,6 @@ class TRTBackend(BaseBackend):
             bindings (list[int]): A list of integer binding the input/output.
         """
         if TRT_VERSION >= 10:
-            self.context.execute_async_v3(self.execute_stream.cuda_stream)
+            self.context.execute_async_v3(self.stream.cuda_stream)
         else: 
-            self.context.execute_async_v2(bindings, 
-                                          self.execute_stream.cuda_stream)
+            self.context.execute_async_v2(bindings, self.stream.cuda_stream)
