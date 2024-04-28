@@ -23,7 +23,6 @@ def torch_dtype_from_trt(dtype: trt.DataType) -> torch.dtype:
     Returns:
         torch.dtype: The corresponding data type in torch.
     """
-
     if dtype == trt.bool:
         return torch.bool
     elif dtype == trt.int8:
@@ -84,9 +83,32 @@ class TRTBackend(BaseBackend):
             self.context.temporary_allocator = self.allocator
 
         self.__load_io_names()
-        
-        input_specs, output_specs = [], []
-        profile_id = 0
+        input_specs = self.__get_input_specs()
+        output_specs = self.__get_output_specs()
+        super().__init__([engine_file], input_specs, output_specs)
+    
+    def __load_io_names(self):
+        """Load input/output names from engine."""
+        input_names_idxs, output_names_idxs = [], []
+        if TRT_VERSION >= 10:
+            for i in range(self.engine.num_io_tensors):
+                name = self.engine.get_tensor_name(i)
+                if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                    input_names_idxs.append({'name': name, 'idx': i})
+                else:
+                    output_names_idxs.append({'name': name, 'idx': i})
+        else:
+            for i in range(self.engine.num_bindings):
+                name = self.engine.get_binding_name(i)
+                if self.engine.binding_is_input(name):
+                    input_names_idxs.append({'name': name, 'idx': i})
+                else:
+                    output_names_idxs.append({'name': name, 'idx': i})
+        self._input_names_idxs = input_names_idxs
+        self._output_names_idxs = output_names_idxs
+    
+    def __get_input_specs(self):
+        profile_id, input_specs = 0, []
         for input_name_idx in self._input_names_idxs:
             input_name = input_name_idx['name']
             index = input_name_idx['idx']
@@ -112,7 +134,11 @@ class TRTBackend(BaseBackend):
                              'max': profile_shape[2]}
             input_specs.append(
                 BackendIOSpec(index, input_name, shape, dtype))
+        return input_specs
 
+    def __get_output_specs(self):
+        assert self._output_names_idxs
+        output_specs = []
         for output_name_idx in self._output_names_idxs:
             output_name = output_name_idx['name']
             index = output_name_idx['idx']
@@ -126,27 +152,7 @@ class TRTBackend(BaseBackend):
                 shape = tuple(self.context.get_binding_shape(index))
             output_specs.append(
                 BackendIOSpec(index, output_name, shape, dtype))
-        super().__init__([engine_file], input_specs, output_specs)
-    
-    def __load_io_names(self):
-        """Load input/output names from engine."""
-        input_names_idxs, output_names_idxs = [], []
-        if TRT_VERSION >= 10:
-            for i in range(self.engine.num_io_tensors):
-                name = self.engine.get_tensor_name(i)
-                if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
-                    input_names_idxs.append({'name': name, 'idx': i})
-                else:
-                    output_names_idxs.append({'name': name, 'idx': i})
-        else:
-            for i in range(self.engine.num_bindings):
-                name = self.engine.get_binding_name(i)
-                if self.engine.binding_is_input(name):
-                    input_names_idxs.append({'name': name, 'idx': i})
-                else:
-                    output_names_idxs.append({'name': name, 'idx': i})
-        self._input_names_idxs = input_names_idxs
-        self._output_names_idxs = output_names_idxs
+        return output_specs
 
     def _infer(self, inputs: Sequence[Tensor]) -> Dict[str, Tensor]:
         """Do inference.
