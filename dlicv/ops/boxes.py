@@ -110,7 +110,8 @@ def batched_nms(boxes: Tensor,
                 iou_thres: float = 0.45,
                 class_agnostic: bool = False,
                 nms_pre: int = -1) -> Tuple[Tensor, Tensor]:
-
+    if boxes.numel() == 0:
+       return torch.empty((0,), dtype=torch.int64, device=boxes.device)
     if nms_pre > -1:
         scores, inds = scores.sort(descending=True)
         inds = inds[:nms_pre]
@@ -120,6 +121,10 @@ def batched_nms(boxes: Tensor,
     if class_agnostic:
         boxes_for_nms = boxes
     else:
+        # strategy: in order to perform NMS independently per class,
+        # we add an offset to all the boxes. The offset is dependent
+        # only on the class idx, and is large enough so that boxes
+        # from different classes do not overlap
         max_coordinate = boxes.max()
         offsets = idxs.to(boxes) * (
             max_coordinate + torch.tensor(1).to(boxes))
