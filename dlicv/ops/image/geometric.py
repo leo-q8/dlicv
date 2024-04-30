@@ -515,3 +515,29 @@ def imcrop(img: ImgType,
         return patches[0], returned_boxes[0]
     else:
         return patches, returned_boxes
+
+
+def imflip(img: ImgType, direction: str = 'horizontal') -> ImgType:
+    """Flip an image horizontally or vertically.
+
+    Args:
+        img (ndarray): Image to be flipped.
+        direction (str): The flip direction, either "horizontal" or
+            "vertical" or "diagonal".
+
+    Returns:
+        ndarray: The flipped image.
+    """
+    assert direction in ['horizontal', 'vertical', 'diagonal']
+    if direction == 'horizontal':
+        if isinstance(img, np.ndarray):
+            return np.flip(img, axis=1)
+        return img.flip(-1)
+    elif direction == 'vertical':
+        if isinstance(img, np.ndarray):
+            return np.flip(img, axis=0)
+        return img.flip(-2)
+    else:
+        if isinstance(img, np.ndarray):
+            return np.flip(img, axis=(0, 1))
+        return img.flip((-2, -1))

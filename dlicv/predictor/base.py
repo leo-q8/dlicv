@@ -256,9 +256,19 @@ class BasePredictor(metaclass=PredictorMeta):
         while True:
             try:
                 chunk_data = []
-                for _ in range(chunk_size):
-                    processed_data = next(inputs_iter)
+                processed_data = next(inputs_iter) 
+                if isinstance(processed_data, dict):
                     chunk_data.append(processed_data)
+                    for _ in range(chunk_size - 1):
+                        processed_data = next(inputs_iter)
+                        chunk_data.append(processed_data)
+                elif isinstance(processed_data, (tuple, list)):
+                    assert len(processed_data) == chunk_size
+                    chunk_data.extend(list(processed_data))
+                else:
+                    raise TypeError(
+                        "data given by `pipeline` must be a dict ,tupel or a "
+                        f"list, but got {type(processed_data)}")
                 yield chunk_data
             except StopIteration:
                 if chunk_data:

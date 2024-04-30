@@ -1,5 +1,66 @@
+from typing import Optional
+
+import numpy as np
+import torch
+
 from dlicv.structures import BaseDataElement
+from dlicv.utils.device import DeviceType
 from .base import BaseTransform
+
+
+class ImgToTensor(BaseTransform):
+    """Convert image to :obj:`torch.Tensor`.
+
+    The dimension order of input image is (H, W, C). The pipeline will convert
+    it to (C, H, W). If only 2 dimension (H, W) is given, the output would be
+    (1, H, W).
+
+    Required keys:
+
+    - img
+
+    Modified Keys:
+
+    - img
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        device (str | None): 
+    """
+    def __init__(self,
+                 to_float32: bool = False,
+                 device: Optional[DeviceType] = None) -> None:
+        self.device = device 
+        self.to_float32 = to_float32
+
+    def transform(self, results: dict) -> dict:
+        img = results['img']
+        if len(img.shape) < 3:
+            img = np.expand_dims(img, -1)
+        # To improve the computational speed by by 3-5 times, apply:
+        # If image is not contiguous, use
+        # `numpy.transpose()` followed by `numpy.ascontiguousarray()`
+        # If image is already contiguous, use
+        # `torch.permute()` followed by `torch.contiguous()`
+        # Refer to https://github.com/open-mmlab/mmdetection/pull/9533
+        # for more details
+        if not img.flags.c_contiguous:
+            img = np.ascontiguousarray(img.transpose(2, 0, 1))
+            img = torch.from_numpy(img).to(self.device)
+        else:
+            img = torch.from_numpy(img).to(self.device).permute(
+                2, 0, 1).contiguous()
+        if self.to_float32 and img.dtype != torch.float32:
+            img = img.to(torch.float32)
+        results['img'] = img
+        return results
+    
+    def __repr__(self) -> str:
+        repr_str = self.__class__.__name__
+        repr_str += f'(to_float32={self.to_float32}, device={self.device})'
+        return repr_str
 
 
 class PackImgInputs(BaseTransform):

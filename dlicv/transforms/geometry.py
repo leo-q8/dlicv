@@ -203,4 +203,62 @@ class Pad(BaseTransform):
          
 class CenterCrop(BaseTransform):
     pass
+
+
+class Flip(BaseTransform):
+    """Flip the. Added or Updated
+    keys: flip, flip_direction, img. 
+
+    Required Keys:
+
+    - img
+
+    Modified Keys:
+
+    - img
+
+    Added Keys:
+
+    - flip
+    - flip_direction
+
+    Args:
+        direction(str | list[str]): The flipping direction. Options
+            If input is a list, the length must equal ``prob``. Each
+            element in ``prob`` indicates the flip probability of
+            corresponding direction. Defaults to 'horizontal'.
+    """
+
+    def __init__(self, direction: str = 'horizontal') -> None:
+
+        valid_directions = ['horizontal', 'vertical', 'diagonal']
+        assert isinstance(direction, str) and direction in valid_directions
+        self.direction = direction
+
+    def transform(self, results: dict) -> dict:
+        """Transform function to flip images, bounding boxes, semantic
+        segmentation map and keypoints.
+
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Flipped results, 'img', 'gt_bboxes', 'gt_seg_map',
+            'gt_keypoints', 'flip', and 'flip_direction' keys are
+            updated in result dict.
+        """
+        # flip image
+        results['img'] = dlicv.imflip(
+            results['img'], direction=self.direction)
+
+        results['flip'] = True
+        results['flip_direction'] = self.direction
+
+        return results
+
+    def __repr__(self) -> str:
+        repr_str = self.__class__.__name__
+        repr_str += f'direction={self.direction})'
+
+        return repr_str
     

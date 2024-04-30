@@ -9,7 +9,7 @@ from dlicv.structures import DetDataSample, InstanceData
 from dlicv.ops import batched_nms, box_wh, imwrite
 from dlicv.visualization import UniversalVisualizer
 from dlicv.utils import Classes
-from dlicv.transforms import Compose, PackImgInputs
+from dlicv.transforms import Compose, PackImgInputs, TestTimeAug
 from .base import BasePredictor, ModelType
 
 SampleList = List[DetDataSample]
@@ -69,21 +69,16 @@ class BaseDetector(BasePredictor):
                 f'{set(nms_cfg) - valid_nms_params} is invalid nms params'
         if conf is not None:
             assert 0. < conf < 1.
-        if isinstance(pipeline, (list, tuple)):
-            if not isinstance(pipeline[-1], PackImgInputs):
-                pipeline = list(pipeline)
-                pipeline.append(PackImgInputs(DetDataSample))
-        elif isinstance(pipeline, Compose):
-            if not isinstance(pipeline.transforms[-1], PackImgInputs):
-                pipeline.transforms.append(PackImgInputs(DetDataSample))
-        else:
-            pipeline = Compose([pipeline, PackImgInputs(DetDataSample)])
-        super().__init__(backend_model, pipeline)
-
         self.conf = conf
         self.min_box_size = min_box_size
         self.nms_cfg = nms_cfg
         self.max_det = max_det
+        self.tta = False
+        self.num_augment = 0
+        
+        pipeline = self.__init_pipeline(pipeline)
+        super().__init__(backend_model, pipeline)
+
         if isinstance(classes, str):
             if palette is None:
                 palette = classes
@@ -91,6 +86,24 @@ class BaseDetector(BasePredictor):
         self.classes = classes
         self.palette = palette
         self.visualizer = UniversalVisualizer()
+    
+    def __init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
+    ) -> Callable:
+        if isinstance(pipeline, (list, tuple)):
+            if isinstance(pipeline[-1], TestTimeAug):
+                self.tta = True
+                self.num_augment = len(pipeline[-1].subroutines)
+            elif not isinstance(pipeline[-1], PackImgInputs):
+                pipeline = list(pipeline)
+                pipeline.append(PackImgInputs(DetDataSample))
+        elif isinstance(pipeline, Compose):
+            if isinstance(pipeline[-1], TestTimeAug):
+                self.tta = True
+                self.num_augment = len(pipeline[-1].subroutines)
+            if not isinstance(pipeline.transforms[-1], PackImgInputs):
+                pipeline.transforms.append(PackImgInputs(DetDataSample))
+        else:
+            pipeline = Compose([pipeline, PackImgInputs(DetDataSample)])
     
     @abstractmethod
     def _parse_preds(self, preds: Any, 
