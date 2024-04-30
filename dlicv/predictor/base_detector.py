@@ -97,10 +97,10 @@ class BaseDetector(BasePredictor):
                 pipeline = list(pipeline)
                 pipeline.append(PackImgInputs(DetDataSample))
         elif isinstance(pipeline, Compose):
-            if isinstance(pipeline[-1], TestTimeAug):
+            if isinstance(pipeline.transforms[-1], TestTimeAug):
                 self.tta = True
                 self.num_augment = len(pipeline[-1].subroutines)
-            if not isinstance(pipeline.transforms[-1], PackImgInputs):
+            elif not isinstance(pipeline.transforms[-1], PackImgInputs):
                 pipeline.transforms.append(PackImgInputs(DetDataSample))
         else:
             pipeline = Compose([pipeline, PackImgInputs(DetDataSample)])
