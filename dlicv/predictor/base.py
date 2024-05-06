@@ -12,9 +12,12 @@ import torch
 import torch.nn as nn
 from rich.progress import track
 
-from dlicv.transforms import Compose
+from dlicv.transforms import Compose, TestTimeAug
 from dlicv.structures import BaseDataElement
 from ..backend import BackendModel
+from .utils import default_collate
+
+SampleList = List[BaseDataElement]
 
 InputType = Union[str, np.ndarray, torch.Tensor]
 InputsType = Union[InputType, Sequence[InputType]]
@@ -110,16 +113,14 @@ class BasePredictor(metaclass=PredictorMeta):
         if isinstance(backend_model, dict):
             backend_model = BackendModel(**backend_model)
         self.backend_model = backend_model
-        if isinstance(pipeline, (list, tuple)):
-            pipeline = Compose(pipeline)
-        self.pipeline = pipeline
+        self.pipeline, self.tta_num_aug = self._init_pipeline(pipeline)
         # A global counter tracking the number of images processed, for
         # naming of the output images
         self.num_visualized_imgs = 0
 
     def __call__(self, 
                  inputs: InputsType, 
-                 batch_size: Optional[int] = None,
+                 batch_size: int = 1,
                  show: bool = False,
                  wait_time: float = 0,
                  show_dir: Optional[Union[str, Path]] = None,
@@ -163,7 +164,7 @@ class BasePredictor(metaclass=PredictorMeta):
         # Preprocess the user inputs into a model-feedable fromat.
         inputs = self.preprocess(inputs, batch_size, **preprocess_kwargs)
 
-        results, visualizations = [], [] 
+        ori_imgs, aug_results, results, visualizations = [], [], [], [] 
         for data in (track(inputs, description='Predict') 
                      if show_progress else inputs):
             # Predict the data with the `backend_model`.
@@ -172,23 +173,78 @@ class BasePredictor(metaclass=PredictorMeta):
             batch_results = self.postprocess(preds, 
                                              data['data_samples'],
                                              **postprocess_kwargs)
-            results.extend(batch_results)
-            # Visualize the results.
-            batch_visualizations = self.visualize(data['ori_imgs'], 
-                                                  batch_results, 
-                                                  show=show, 
-                                                  wait_time=wait_time,
-                                                  show_dir=show_dir,
-                                                  **visualize_kwargs)
-            if batch_visualizations is not None:
-                visualizations.extend(visualizations)   
+            if self.tta_num_aug > 1: # Do tta inference.
+                aug_results.extend(batch_results)
+                ori_imgs.extend(data['ori_imgs'])
+                if len(aug_results) == self.tta_num_aug:
+                    merge_result = self.tta_merge_results(aug_results)
+                    aug_results.append(merge_result)
+                    ori_imgs.append(ori_imgs[-1])
+                    # Visualize the results.
+                    aug_visualizations = self.visualize(ori_imgs, 
+                                                        aug_results, 
+                                                        show=show, 
+                                                        wait_time=wait_time,
+                                                        show_dir=show_dir,
+                                                        **visualize_kwargs)
+                    results.append(merge_result)
+                    if aug_visualizations is not None:
+                        visualizations.append(aug_visualizations[1])   
+                    aug_results, ori_imgs = [], []
+            else:
+                results.extend(batch_results)
+                # Visualize the results.
+                batch_visualizations = self.visualize(data['ori_imgs'], 
+                                                      batch_results, 
+                                                      show=show, 
+                                                      wait_time=wait_time,
+                                                      show_dir=show_dir,
+                                                      **visualize_kwargs)
+                if batch_visualizations is not None:
+                    visualizations.extend(batch_visualizations)   
+            
+        if return_vis:
+            return {'results': results, 'visualizations': visualizations}
+        return {'results': results}
 
-        return {'results': results, 'visualizations': visualizations} if \
-            return_vis else {'results': results}
+    def _init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
+                       ) -> Tuple[Callable, int]:
+        """Initialize the preprocess pipeline.
 
-    def _inputs_to_list(self, 
-                        inputs: InputsType,
-                        batch_size: Optional[int] = None) -> Tuple[list, int]:
+        Return a pipeline to handle various input data, such as ``str``,
+        ``np.ndarray``. And an int to specify the number of the strategies of 
+        test-time augmention.
+
+        The returned pipeline will be used to process a single data.
+        It will be used in :meth:`preprocess` like this:
+
+        .. code-block:: python
+            def preprocess(self, inputs, batch_size, **kwargs):
+                ...
+                dataset = map(self.pipeline, dataset)
+                ...
+        
+        Returns:
+            `dlicv.transforms.Compose`: Pipeline to handle various input data.
+            int: Specify the number of the strategies of test-time augmention.
+                 when it greater than 1. `1` indicates that test-time 
+                 augmention has not been used.
+        """
+        tta_num_aug = 1
+        if isinstance(pipeline, (list, tuple)):
+            if isinstance(pipeline[-1], TestTimeAug):
+                tta_num_aug = len(pipeline[-1].subroutines)
+            pipeline = Compose(pipeline)
+        elif isinstance(pipeline, Compose):
+            if isinstance(pipeline.transforms[-1], TestTimeAug):
+                tta_num_aug = len(pipeline.transforms[-1].subroutines)
+        else:
+            raise TypeError(
+                f"pipeline must be a instance of `dlicv.transforms.Compose` or"
+                f" a sequence of `dlicv.transforms`, but got {type(pipeline)}")
+        return pipeline, tta_num_aug
+
+    def _inputs_to_list(self, inputs: InputsType) -> Tuple[list, int]:
         """Preprocess the inputs to a list and derive batch size based on input
         type and `batch_size` specified by user.
 
@@ -204,29 +260,22 @@ class BasePredictor(metaclass=PredictorMeta):
 
         Returns:
             list: List of input for the :meth:`preprocess`.
-            int: Batch size for infer.
         """
         if isinstance(inputs, str):
             path = str(Path(inputs).absolute())
             if os.path.isdir(path):
-                batch_size = 1 if batch_size is None else batch_size
                 inputs = sorted(
                     filter(lambda f: f.split('.')[-1] in IMG_EXTENSIONS,
                     glob.glob(os.path.join(path, '*.*'))))
-            elif os.path.isfile(path):
-                batch_size = 1
         elif isinstance(inputs, torch.Tensor) and inputs.ndim == 4:
-            batch_size = len(inputs) if batch_size is None else batch_size
             inputs = [input for input in inputs]
             
         if not isinstance(inputs, (list, tuple)):
-            batch_size = 1 if batch_size is None else batch_size
             inputs = [inputs]
 
-        inputs = [{'img_path' if isinstance(input, str) else 'ori_img': input}
-                  for input in inputs]
+        return [{'img_path' if isinstance(input, str) else 'ori_img': input}
+                for input in inputs]
                    
-        return inputs, batch_size
 
     def _collect_batch(self, data_batch: Sequence[dict]) -> dict:
         """Convert list of data sampled from ``pipeline`` into a batch of data.
@@ -237,10 +286,7 @@ class BasePredictor(metaclass=PredictorMeta):
         Returns:
             dict: Batched data with dict type.
         """
-        data = {key: [d[key] for d in data_batch]
-                for key in data_batch[0]}
-        data['inputs'] = torch.stack(data['inputs'])
-        return data
+        return default_collate(data_batch)
     
     def _get_chunk_data(self, inputs: Iterable, chunk_size: int):
         """Get batch data from dataset.
@@ -253,23 +299,21 @@ class BasePredictor(metaclass=PredictorMeta):
             list: batch data.
         """
         inputs_iter = iter(inputs)
+        chunk_data = []
         while True:
             try:
-                chunk_data = []
-                processed_data = next(inputs_iter) 
-                if isinstance(processed_data, dict):
-                    chunk_data.append(processed_data)
-                    for _ in range(chunk_size - 1):
-                        processed_data = next(inputs_iter)
+                while len(chunk_data) < chunk_size:
+                    processed_data = next(inputs_iter) 
+                    if isinstance(processed_data, dict):
                         chunk_data.append(processed_data)
-                elif isinstance(processed_data, (tuple, list)):
-                    assert len(processed_data) == chunk_size
-                    chunk_data.extend(list(processed_data))
-                else:
-                    raise TypeError(
-                        "data given by `pipeline` must be a dict ,tupel or a "
-                        f"list, but got {type(processed_data)}")
-                yield chunk_data
+                    elif isinstance(processed_data, (tuple, list)):
+                        chunk_data.extend(list(processed_data))
+                    else:
+                        raise TypeError(
+                            f"data given by `pipeline` must be a dict, tuple "
+                            f"or a list, but got {type(processed_data)}")
+                yield chunk_data[:chunk_size]
+                chunk_data = chunk_data[chunk_size:]
             except StopIteration:
                 if chunk_data:
                     yield chunk_data
@@ -301,7 +345,9 @@ class BasePredictor(metaclass=PredictorMeta):
         Returns:
             Any: Data processed by the ``pipeline`` and ``_collect_batch``.
         """
-        list_inputs, batch_size = self._inputs_to_list(inputs, batch_size)
+        assert self.tta_num_aug <= 1 or self.tta_num_aug % batch_size == 0
+
+        list_inputs = self._inputs_to_list(inputs)
         chunked_data = self._get_chunk_data(
             map(self.pipeline, list_inputs), batch_size)
         yield from map(self._collect_batch, chunked_data)
@@ -314,8 +360,8 @@ class BasePredictor(metaclass=PredictorMeta):
     @abstractmethod
     def postprocess(self, 
                     preds: Any, 
-                    batch_datasamples: List[BaseDataElement], 
-                    **kwargs) -> List[BaseDataElement]:
+                    batch_datasamples: SampleList, 
+                    **kwargs) -> SampleList:
         """Process the predictions results from ``forward``.
 
         Customize your postprocess by overriding this method. 
@@ -328,6 +374,21 @@ class BasePredictor(metaclass=PredictorMeta):
         Returns:
             list: Prediction results.
         """
+    
+    def tta_merge_results(self, aug_samples: SampleList
+                          ) -> BaseDataElement:
+        """Merge results of enhanced data to one result.
+
+        Args:
+            aug_samples (List[BaseDataElement]): List of results
+                of all enhanced data.
+
+        Returns:
+            BaseDataElement: Merged result.
+        """
+        raise NotImplementedError(
+            'When inference with test-time augmention, please implement this '
+            'method to merge predictions of enhanced data to one prediction')
    
     def visualize(self,
                   inputs: InputsType,
@@ -365,7 +426,7 @@ class BasePredictor(metaclass=PredictorMeta):
             Tuple[Dict, Dict, Dict, Dict]: kwargs passed to preprocess,
             forward, visualize and postprocess respectively.
         """
-        union_kwargs = self.all_kwargs | set(kwargs.keys())
+        union_kwargs = self.all_kwargs | set(kwargs)
         if union_kwargs != self.all_kwargs:
             unknown_kwargs = union_kwargs - self.all_kwargs
             raise ValueError(
@@ -399,6 +460,6 @@ class BasePredictor(metaclass=PredictorMeta):
         return (
             preprocess_kwargs,
             forward_kwargs,
-            postprocess_kwargs,
             visualize_kwargs,
+            postprocess_kwargs,
         )

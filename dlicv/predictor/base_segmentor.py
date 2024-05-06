@@ -5,9 +5,10 @@ import numpy as np
 from torch import Tensor
 import torch.nn.functional as F
 
+from dlicv import BackendModel
 from dlicv.ops import imwrite
 from dlicv.structures import SegDataSample, PixelData
-from dlicv.transforms import Compose, PackImgInputs
+from dlicv.transforms import Compose, PackImgInputs, TestTimeAug
 from dlicv.utils import Classes
 from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
@@ -47,17 +48,7 @@ class BaseSegmentor(BasePredictor):
         self.align_corners = align_corners
         self.use_sigmoid = use_sigmoid
 
-        if isinstance(pipeline, (list, tuple)):
-            if not isinstance(pipeline[-1], PackImgInputs):
-                pipeline = list(pipeline)
-                pipeline.append(PackImgInputs(SegDataSample))
-        elif isinstance(pipeline, Compose):
-            if not isinstance(pipeline.transforms[-1], PackImgInputs):
-                pipeline.transforms.append(PackImgInputs(SegDataSample))
-        else:
-            pipeline = Compose([pipeline, PackImgInputs(SegDataSample)])
         super().__init__(backend_model, pipeline)
-
         if isinstance(classes, str):
             if palette is None:
                 palette = classes
@@ -66,6 +57,45 @@ class BaseSegmentor(BasePredictor):
         self.palette = palette
         self.visualizer = UniversalVisualizer()
     
+    def _init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
+                       ) -> Tuple[Callable, int]:
+        """Initialize the preprocess pipeline.
+
+        Return a pipeline to handle various input data, such as ``str``,
+        ``np.ndarray``. And an int to specify the number of the strategies of 
+        test-time augmention.
+
+        The returned pipeline will be used to process a single data.
+        It will be used in :meth:`preprocess` like this:
+
+        .. code-block:: python
+            def preprocess(self, inputs, batch_size, **kwargs):
+                ...
+                dataset = map(self.pipeline, dataset)
+                ...
+        
+        Returns:
+            `dlicv.transforms.Compose`: Pipeline to handle various input data.
+            int: Specify the number of the strategies of test-time augmention.
+                 when it greater than 1. `1` indicates that test-time 
+                 augmention has not been used.
+        """
+        tta_num_aug = 1
+        if isinstance(pipeline, (list, tuple)):
+            if isinstance(pipeline[-1], TestTimeAug):
+                tta_num_aug = len(pipeline[-1].subroutines)
+            elif not isinstance(pipeline[-1], PackImgInputs):
+                pipeline = list(pipeline)
+                pipeline.append(PackImgInputs(SegDataSample))
+        elif isinstance(pipeline, Compose):
+            if isinstance(pipeline.transforms[-1], TestTimeAug):
+                tta_num_aug = len(pipeline.transforms[-1].subroutines)
+            elif not isinstance(pipeline.transforms[-1], PackImgInputs):
+                pipeline.transforms.append(PackImgInputs(SegDataSample))
+        else:
+            pipeline = Compose([pipeline, PackImgInputs(SegDataSample)])
+        return pipeline, tta_num_aug
+
     def seg_map_postprocess(self,
                             seg_map: Tensor,
                             img_meta: dict) -> Tuple[Tensor, Tensor]:
@@ -150,7 +180,7 @@ class BaseSegmentor(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
-                  show_labels: bool = True,
+                  show_label: bool = True,
                   **kwargs) -> Optional[Union[np.ndarray, List[np.ndarray]]]:
         """Visualize predictions.
 
@@ -187,7 +217,7 @@ class BaseSegmentor(BasePredictor):
                                                      result.pred_sem_seg,
                                                      classes=self.classes,
                                                      palette=self.palette,
-                                                     show_labels=show_labels)
+                                                     show_label=show_label)
             if show:
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:

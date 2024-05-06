@@ -3,10 +3,12 @@ import os.path as osp
 from typing import Any, List, Callable, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import torch
+from pathlib import Path
 from torch import Tensor
 
 from dlicv.structures import DetDataSample, InstanceData
-from dlicv.ops import batched_nms, box_wh, imwrite
+from dlicv.ops import batched_nms, box_wh, flip_boxes, imwrite
 from dlicv.visualization import UniversalVisualizer
 from dlicv.utils import Classes
 from dlicv.transforms import Compose, PackImgInputs, TestTimeAug
@@ -60,7 +62,7 @@ class BaseDetector(BasePredictor):
                  conf: Optional[float] = None,
                  nms_cfg: Optional[dict] = None,
                  min_box_size: int = -1,
-                 max_det: int = -1,
+                 max_det: int = 100,
                  classes: Optional[Union[List[str], str]] = None,
                  palette: Optional[Union[List[tuple], str, tuple]] = None):
         valid_nms_params = {'iou_thres', 'class_agnostic', 'nms_pre'} 
@@ -73,12 +75,8 @@ class BaseDetector(BasePredictor):
         self.min_box_size = min_box_size
         self.nms_cfg = nms_cfg
         self.max_det = max_det
-        self.tta = False
-        self.num_augment = 0
         
-        pipeline = self.__init_pipeline(pipeline)
         super().__init__(backend_model, pipeline)
-
         if isinstance(classes, str):
             if palette is None:
                 palette = classes
@@ -86,24 +84,51 @@ class BaseDetector(BasePredictor):
         self.classes = classes
         self.palette = palette
         self.visualizer = UniversalVisualizer()
+
+        self._num_aug_vis = 0
     
-    def __init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
-    ) -> Callable:
+    def _init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
+                       ) -> Tuple[Callable, int]:
+        """Initialize the preprocess pipeline.
+
+        Return a pipeline to handle various input data, such as ``str``,
+        ``np.ndarray``. And an int to specify the number of the strategies of 
+        test-time augmention.
+
+        The returned pipeline will be used to process a single data.
+        It will be used in :meth:`preprocess` like this:
+
+        .. code-block:: python
+            def preprocess(self, inputs, batch_size, **kwargs):
+                ...
+                dataset = map(self.pipeline, dataset)
+                ...
+        
+        Returns:
+            `dlicv.transforms.Compose`: Pipeline to handle various input data.
+            int: Specify the number of the strategies of test-time augmention.
+                 when it greater than 1. `1` indicates that test-time 
+                 augmention has not been used.
+        """
+        tta_num_aug = 1
         if isinstance(pipeline, (list, tuple)):
             if isinstance(pipeline[-1], TestTimeAug):
-                self.tta = True
-                self.num_augment = len(pipeline[-1].subroutines)
+                tta_num_aug = len(pipeline[-1].subroutines)
             elif not isinstance(pipeline[-1], PackImgInputs):
                 pipeline = list(pipeline)
                 pipeline.append(PackImgInputs(DetDataSample))
+            pipeline = Compose(pipeline)
         elif isinstance(pipeline, Compose):
-            if isinstance(pipeline[-1], TestTimeAug):
-                self.tta = True
-                self.num_augment = len(pipeline[-1].subroutines)
-            if not isinstance(pipeline.transforms[-1], PackImgInputs):
+            if isinstance(pipeline.transforms[-1], TestTimeAug):
+                tta_num_aug = len(pipeline.transforms[-1].subroutines)
+            elif not isinstance(pipeline.transforms[-1], PackImgInputs):
                 pipeline.transforms.append(PackImgInputs(DetDataSample))
         else:
             pipeline = Compose([pipeline, PackImgInputs(DetDataSample)])
+        return pipeline, tta_num_aug
+    
+    def update_pipeline(self, pipeline):
+        self.pipeline, self.tta_num_aug = self._init_pipeline(pipeline)
     
     @abstractmethod
     def _parse_preds(self, preds: Any, 
@@ -166,12 +191,12 @@ class BaseDetector(BasePredictor):
             labels (Tensor[N_post,]): Labels of bboxes, has a shape 
                 (num_object_post, ).
         """
+        assert len(bboxes) == len(scores) == len(labels)
         # filter low confidence boxes 
         if self.conf is not None:
             idxs = scores > self.conf
             bboxes, labels, scores = bboxes[idxs], labels[idxs], scores[idxs]
-
-        # shift and rescale boxes to original image space.
+        # shift, rescale or flip boxes to original image space.
         padding = img_meta.get('padding')
         if padding is not None:
             left_padding, top_padding = padding[:2]
@@ -180,7 +205,11 @@ class BaseDetector(BasePredictor):
         if scale_factor is not None:
             scale_factor = [1 / s for s in scale_factor]
             bboxes *= bboxes.new_tensor(scale_factor * 2)
-        
+        flip_direction = img_meta.get('flip_direction')
+        if flip_direction is not None:
+            ori_shape = img_meta['ori_shape']
+            bboxes = flip_boxes(boxes=bboxes, img_shape=ori_shape, 
+                                direction=flip_direction)
         # filter samll size bboxes
         if self.min_box_size >= 0:
             w, h = box_wh(bboxes)
@@ -189,7 +218,6 @@ class BaseDetector(BasePredictor):
                 bboxes = bboxes[valid_mask]
                 scores = scores[valid_mask]
                 labels = labels[valid_mask]
-
         # do nms
         if self.nms_cfg is not None:
             keep_idxs = batched_nms(bboxes, scores, labels, **self.nms_cfg)
@@ -198,7 +226,6 @@ class BaseDetector(BasePredictor):
             bboxes = bboxes[keep_idxs]
             scores = scores[keep_idxs]
             labels = labels[keep_idxs]
-
         # select topk
         elif self.max_det > -1:
             scores, idxs = scores.sort(descending=True)
@@ -249,6 +276,72 @@ class BaseDetector(BasePredictor):
             results.labels = labels
             data_sample.pred_instances = results
         return batch_datasamples
+    
+    def tta_merge_bboxes(self, aug_bboxes: List[Tensor],
+                         aug_scores: List[Tensor],
+                         img_metas: List[str]) -> Tuple[Tensor, Tensor]:
+        """Merge augmented detection bboxes and scores.
+
+        Args:
+            aug_bboxes (list[Tensor]): shape (n, 4*#class)
+            aug_scores (list[Tensor] or None): shape (n, #class)
+        Returns:
+            tuple[Tensor]: ``bboxes`` with shape (n,4), where
+            4 represent (tl_x, tl_y, br_x, br_y)
+            and ``scores`` with shape (n,).
+        """
+        bboxes = torch.cat(aug_bboxes, dim=0)
+        if aug_scores is None:
+            return bboxes
+        else:
+            scores = torch.cat(aug_scores, dim=0)
+            return bboxes, scores
+    
+    def tta_merge_results(self, aug_samples: SampleList) -> DetDataSample:
+        """Merge predictions which come form the different views of one image
+        to one prediction.
+
+        Args:
+            aug_samples (List[DetDataSample]): List of predictions
+            of enhanced data which come form one image.
+        Returns:
+            DetDataSample: Merged prediction.
+        """
+        aug_bboxes = []
+        aug_scores = []
+        aug_labels = []
+        img_metas = []
+        # TODO: support instance segmentation TTA
+        assert aug_samples[0].pred_instances.get('masks', None) is None, \
+            'TTA of instance segmentation does not support now.'
+        for aug_sample in aug_samples:
+            aug_bboxes.append(aug_sample.pred_instances.bboxes)
+            aug_scores.append(aug_sample.pred_instances.scores)
+            aug_labels.append(aug_sample.pred_instances.labels)
+            img_metas.append(aug_sample.metainfo)
+
+        merged_bboxes, merged_scores = self.tta_merge_bboxes(
+            aug_bboxes, aug_scores, img_metas)
+        merged_labels = torch.cat(aug_labels, dim=0)
+
+        if merged_bboxes.numel() == 0:
+            return aug_samples[0]
+
+        keep_idxs = batched_nms(merged_bboxes, merged_scores, merged_labels, 
+                                **self.nms_cfg)
+        if self.max_det > -1:
+            keep_idxs = keep_idxs[:self.max_det]
+        det_bboxes = merged_bboxes[keep_idxs]
+        det_scores = merged_scores[keep_idxs]
+        det_labels = merged_labels[keep_idxs]
+
+        results = InstanceData()
+        results.bboxes = det_bboxes
+        results.scores = det_scores
+        results.labels = det_labels
+        det_results = aug_samples[0]
+        det_results.pred_instances = results
+        return det_results
 
     def visualize(self,
                   images: ImgsType,
@@ -256,6 +349,8 @@ class BaseDetector(BasePredictor):
                   show: bool = False,
                   wait_time: float = 0,
                   show_dir: Optional[str] = None,
+                  boxes_line_width = 1,
+                  show_label = True,
                   **kwargs) -> Optional[List[np.ndarray]]:
         """Visualize predictions.
 
@@ -265,7 +360,7 @@ class BaseDetector(BasePredictor):
 
         Args:
             images (List[ndarray | Tensor]): Original images to vis.
-            results (Any): Results from :meth:`postprocess`.
+            results (List[DetDataSample]): Results from :meth:`postprocess`.
             show (bool): Whether to display the image in a popup window.
                 Defaults to False.
             wait_time (float): The interval of show (s). 0 is the special
@@ -278,20 +373,28 @@ class BaseDetector(BasePredictor):
         """
         if not show and show_dir is None:
             return None
-        
         visualizations = []
         for img, result in zip(images, results):
             if isinstance(img, Tensor):
                 img = np.ascontiguousarray(
                     img.detach().cpu().numpy().transpose(1, 2, 0))
-            img_name = osp.basename(result.img_path) if 'img_path' in result \
-                else f'{self.num_visualized_imgs:08}.jpg'
+            img_name = Path(result.img_path).stem if 'img_path' in result \
+                else f'{self.num_visualized_imgs:08}'
+            if self.tta_num_aug > 1:
+                suffix = '' if self._num_aug_vis == self.tta_num_aug else \
+                    f'_tta{self._num_aug_vis:02}'
+                img_name += suffix
+                self._num_aug_vis = (self._num_aug_vis + 1) % (
+                    self.tta_num_aug + 1)
+            img_name += '.jpg'
             if 'channel_order' in result and result.channel_order != 'rgb':
                 img = img[..., ::-1]
             drawn_img = self.visualizer.draw_instances(img, 
                                                        result.pred_instances,
-                                                       classes=self.classes,
-                                                       palette=self.palette)
+                                                       self.classes,
+                                                       self.palette,
+                                                       boxes_line_width,
+                                                       show_label=show_label)
             if show:
                 self.visualizer.show(drawn_img, img_name, wait_time=wait_time)
             if show_dir is not None:

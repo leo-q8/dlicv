@@ -96,11 +96,15 @@ class UniversalVisualizer(Visualizer):
                               image: np.ndarray,
                               instances: InstanceData,
                               classes: Optional[Sequence[str]] = None,
-                              palette: Optional[Union[Sequence[tuple], 
-                                                      str]] = None,
+                              palette: Optional[Union[Sequence[tuple
+                                                               ], str]] = None,
+                              boxes_line_width: Optional[Union[int, float
+                                                               ]] = None,
                               show_label: bool = True,
                               show_score: bool = True) -> np.ndarray:
         self.set_image(image)
+        boxes_line_width = self.line_width if boxes_line_width is None else \
+            boxes_line_width
 
         if 'bboxes' in instances and instances.bboxes.sum() > 0:
             bboxes = instances.bboxes
@@ -115,7 +119,7 @@ class UniversalVisualizer(Visualizer):
                 bboxes,
                 edge_colors=colors,
                 alpha=self.alpha,
-                line_widths=self.line_width)
+                line_widths=boxes_line_width)
             
             if (show_label and 'labels' in instances) or (show_score and 
                 'scores' in instances):
@@ -125,7 +129,7 @@ class UniversalVisualizer(Visualizer):
                     labels = [0] * len(bboxes)
                 text_colors = [text_palette[label] for label in labels]
 
-                positions = bboxes[:, :2] + self.line_width
+                positions = bboxes[:, :2] + boxes_line_width
                 areas = (bboxes[:, 3] - bboxes[:, 1]) * (
                     bboxes[:, 2] - bboxes[:, 0])
                 areas = tensor2ndarray(areas) 
@@ -166,9 +170,13 @@ class UniversalVisualizer(Visualizer):
                             image: np.ndarray,
                             instances: InstanceData,
                             kpt_thr: float = 0.3,
+                            skeleton_line_width: Optional[Union[int, float
+                                                                ]] = None,
                             show_skeleton: bool = True,
                             show_kpt_idx: bool = False):
         self.set_image(image)
+        skeleton_line_width = self.line_width if skeleton_line_width is None \
+            else skeleton_line_width
         img_h, img_w, _ = image.shape
         
         if 'keypoints' in instances:
@@ -235,7 +243,7 @@ class UniversalVisualizer(Visualizer):
                                     0.5 * (visible[sk[0]] + visible[sk[1]])))
 
                         self.draw_lines(
-                            X, Y, color, line_widths=self.line_width)
+                            X, Y, color, line_widths=skeleton_line_width)
 
                 # draw each point on image
                 for kid, kpt in enumerate(kpts):
@@ -274,11 +282,15 @@ class UniversalVisualizer(Visualizer):
                             classes: Optional[Sequence[str]] = None,
                             palette: Optional[Union[Sequence[tuple
                                                              ], str]] = None,
+                            mask_edge_width: Optional[Union[int, float
+                                                            ]] = None,
                             show_mask: bool = True,
                             show_edge: bool = True,
                             show_label: bool = True,
                             show_score: bool = True) -> np.ndarray:
         self.set_image(image)
+        mask_edge_width = self.line_width if mask_edge_width is None else \
+            mask_edge_width
 
         if 'masks' in instances:
             assert show_mask or show_edge, ('One of `show_mask` and '
@@ -306,7 +318,7 @@ class UniversalVisualizer(Visualizer):
                 self.draw_polygons(polygons, 
                                    edge_colors=edge_colors,
                                    alpha=self.alpha,
-                                   line_widths=self.line_width)
+                                   line_widths=mask_edge_width)
 
             if (show_label and 'labels' in instances) or (show_score and 
                 'scores' in instances):
@@ -363,6 +375,9 @@ class UniversalVisualizer(Visualizer):
                        instances: InstanceData,
                        classes: Optional[Sequence[str]] = None,
                        palette: Optional[Union[Sequence[tuple], str]] = None,
+                       boxes_line_width: Optional[Union[int, float]] = None,
+                       skeleton_line_width: Optional[Union[int, float]] = None,
+                       mask_edge_width: Optional[Union[int, float]] = None,
                        kpt_thr: float = 0.3,
                        show_bbox: bool = True,
                        show_label: bool = True,
@@ -386,19 +401,34 @@ class UniversalVisualizer(Visualizer):
             np.ndarray: the drawn image which channel is RGB.
         """
         if show_bbox:
-            image = self.draw_instances_bboxes(image, instances, classes,
-                                               palette, show_label, show_score)
+            image = self.draw_instances_bboxes(image, 
+                                               instances, 
+                                               classes,
+                                               palette, 
+                                               boxes_line_width,
+                                               show_label, 
+                                               show_score)
             #Prioritize drawing the labels and scores around the bboxes.
             show_score, show_label = False, False
         
         if show_mask or show_edge:
-            image = self.draw_instances_masks(image, instances, classes, 
-                                              palette, show_mask, show_edge,
-                                              show_label, show_score)
+            image = self.draw_instances_masks(image, 
+                                              instances,
+                                              classes, 
+                                              palette,
+                                              mask_edge_width, 
+                                              show_mask,
+                                              show_edge,
+                                              show_label, 
+                                              show_score)
 
         if show_kpt:
-            image = self.draw_instances_kpts(image, instances, kpt_thr,
-                                             show_skeleton, show_kpt_idx)
+            image = self.draw_instances_kpts(image, 
+                                             instances,
+                                             kpt_thr,
+                                             skeleton_line_width,
+                                             show_skeleton,
+                                             show_kpt_idx)
         self.set_image(image) 
         return self.get_image()
     
@@ -407,7 +437,7 @@ class UniversalVisualizer(Visualizer):
                      sem_seg: PixelData,
                      classes: Optional[Sequence[str]] = None,
                      palette: Optional[Union[Sequence[tuple], str]] = None,
-                     show_labels: Optional[bool] = True) -> np.ndarray:
+                     show_label: Optional[bool] = True) -> np.ndarray:
         sem_seg = sem_seg.cpu().data  
         ids = np.unique(sem_seg)[::-1]
         max_label = int(max(ids))
@@ -422,7 +452,7 @@ class UniversalVisualizer(Visualizer):
             mask[sem_seg[0] == label, :] = color
         self.set_image(image)
 
-        if show_labels:
+        if show_label:
             def _get_center_loc(mask: np.ndarray) -> np.ndarray:
                 """Get semantic seg center coordinate.
 

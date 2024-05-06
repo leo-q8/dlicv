@@ -5,9 +5,10 @@ import numpy as np
 from torch import Tensor
 import torch.nn.functional as F
 
+from dlicv import BackendModel
 from dlicv.ops import imwrite
 from dlicv.structures import ClsDataSample
-from dlicv.transforms import PackImgInputs, Compose
+from dlicv.transforms import PackImgInputs, Compose, TestTimeAug
 from dlicv.utils import Classes
 from dlicv.visualization import UniversalVisualizer
 from .base import BasePredictor, ModelType
@@ -43,18 +44,8 @@ class BaseClassifier(BasePredictor):
             assert 0. < binary_thres < 1.
         assert not (use_sigmoid and use_softmax), ('Only one of `use_sigmoid`'
             ' and `use_softmax` can be set')
-
-        if isinstance(pipeline, (list, tuple)):
-            if not isinstance(pipeline[-1], PackImgInputs):
-                pipeline = list(pipeline)
-                pipeline.append(PackImgInputs(ClsDataSample))
-        elif isinstance(pipeline, Compose):
-            if not isinstance(pipeline.transforms[-1], PackImgInputs):
-                pipeline.transforms.append(PackImgInputs(ClsDataSample))
-        else:
-            pipeline = Compose([pipeline, PackImgInputs(ClsDataSample)])
+        
         super().__init__(backend_model, pipeline)
-
         self.binary_thres = binary_thres
         self.use_softmax = use_softmax
         self.use_sigmoid = use_sigmoid
@@ -62,6 +53,45 @@ class BaseClassifier(BasePredictor):
             classes = Classes[classes].value
         self.classes = classes
         self.visualizer = UniversalVisualizer()
+    
+    def _init_pipeline(self, pipeline: Union[Callable, Sequence[Callable]]
+                       ) -> Tuple[Callable, int]:
+        """Initialize the preprocess pipeline.
+
+        Return a pipeline to handle various input data, such as ``str``,
+        ``np.ndarray``. And an int to specify the number of the strategies of 
+        test-time augmention.
+
+        The returned pipeline will be used to process a single data.
+        It will be used in :meth:`preprocess` like this:
+
+        .. code-block:: python
+            def preprocess(self, inputs, batch_size, **kwargs):
+                ...
+                dataset = map(self.pipeline, dataset)
+                ...
+        
+        Returns:
+            `dlicv.transforms.Compose`: Pipeline to handle various input data.
+            int: Specify the number of the strategies of test-time augmention.
+                 when it greater than 1. `1` indicates that test-time 
+                 augmention has not been used.
+        """
+        tta_num_aug = 1
+        if isinstance(pipeline, (list, tuple)):
+            if isinstance(pipeline[-1], TestTimeAug):
+                tta_num_aug = len(pipeline[-1].subroutines)
+            elif not isinstance(pipeline[-1], PackImgInputs):
+                pipeline = list(pipeline)
+                pipeline.append(PackImgInputs(ClsDataSample))
+        elif isinstance(pipeline, Compose):
+            if isinstance(pipeline.transforms[-1], TestTimeAug):
+                tta_num_aug = len(pipeline.transforms[-1].subroutines)
+            elif not isinstance(pipeline.transforms[-1], PackImgInputs):
+                pipeline.transforms.append(PackImgInputs(ClsDataSample))
+        else:
+            pipeline = Compose([pipeline, PackImgInputs(ClsDataSample)])
+        return pipeline, tta_num_aug
     
     def postprocess(self,
                     cls_preds: Tensor, 

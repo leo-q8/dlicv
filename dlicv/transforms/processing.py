@@ -1,6 +1,6 @@
 import copy
 from numbers import Number
-from typing import Sequence, Union, List
+from typing import Sequence, Union, List, Optional
 
 import cv2
 import numpy as np
@@ -76,20 +76,35 @@ class Normalize(BaseTransform):
 class TestTimeAug(BaseTransform):
     """Test-time augmentation transform.
 
-    An example configuration is as followed:
+    An example use is as followed:
 
     .. code-block::
 
-        dict(type='TestTimeAug',
+        TestTimeAug(
              transforms=[
-                [dict(type='Resize', scale=(1333, 400), keep_ratio=True),
-                 dict(type='Resize', scale=(1333, 800), keep_ratio=True)],
-                [dict(type='RandomFlip', prob=1.),
-                 dict(type='RandomFlip', prob=0.)],
-                [dict(type='PackDetInputs',
-                      meta_keys=('img_id', 'img_path', 'ori_shape',
-                                 'img_shape', 'scale_factor', 'flip',
-                                 'flip_direction'))]])
+                [Resize(scale=1024, keep_ratio=True),
+                 Flip(direction='vertical'),
+                 Pad(to_square=True),
+                 PackDetInputs(
+                      meta_keys=('img_id', 'img_path', 'ori_shape', 
+                                 'img_shape', 'scale_factor', 
+                                 'flip_direction'))
+                ],
+                [Resize(scale=768, keep_ratio=True),
+                 Flip(),
+                 Pad(min_size=1024, to_square=True),
+                 PackDetInputs(
+                      meta_keys=('img_id', 'img_path', 'ori_shape', 
+                                 'img_shape', 'scale_factor', 
+                                 'flip_direction'))
+                ],
+                [Resize(scale=512, keep_ratio=True),
+                 Pad(min_size=1024, to_square=True),
+                 PackDetInputs(
+                      meta_keys=('img_id', 'img_path', 'ori_shape', 
+                                 'img_shape', 'scale_factor', 
+                                 'flip_direction'))
+                ]])
 
     ``results`` will be transformed using all transforms defined in
     ``transforms`` arguments.
@@ -129,13 +144,19 @@ class TestTimeAug(BaseTransform):
             elements sequentially. See more information in :meth:`transform`.
     """
 
-    def __init__(self, transforms: list):
+    def __init__(self, transforms: list, 
+                 last_transforms: Optional[Union[callable, List[callable
+                                                                ]]] = None):
         assert type(transforms) == list, '`transforms` must be a list'
         for transform_list in transforms:
+            assert type(transform_list) == list, '`subroutine` must be a list'
             for transform in transform_list:
                 if not callable(transform):
                     raise TypeError('transform must be callable, but '
                                     f'got {type(transform)}')
+        if last_transforms is not None and type(last_transforms) == list:
+            last_transforms = Compose(last_transforms)
+        self.last_transforms = last_transforms
         self.subroutines = [
             Compose(subroutine) for subroutine in transforms
         ]
@@ -165,8 +186,12 @@ class TestTimeAug(BaseTransform):
             into a list.
         """
         results_list = []  # type: ignore
+        ori_img = results.pop('ori_img') if 'ori_img' in results else None
         for subroutine in self.subroutines:
-            result = subroutine(copy.deepcopy(results))
+            copy_result = copy.deepcopy(results)
+            if ori_img is not None:
+                copy_result['ori_img'] = ori_img
+            result = subroutine(copy_result)
             assert isinstance(result, dict), (
                 f'Data processed by {subroutine} must return a dict, but got '
                 f'{result}')
@@ -174,6 +199,10 @@ class TestTimeAug(BaseTransform):
                 f'Data processed by {subroutine} in `TestTimeAug` should not '
                 f'be None! Please check the transforms in {subroutine}')
             results_list.append(result)
+        
+        if self.last_transforms is not None:
+            results_list = [self.last_transforms(result) for result in 
+                            results_list]
 
         return results_list
 

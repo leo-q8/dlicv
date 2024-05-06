@@ -155,7 +155,7 @@ class Pad(BaseTransform):
                  pad_val: Union[Number, Sequence[Number]] = 0,
                  padding_mode: str = 'constant'):
         assert (min_size is None) or (size_divisor is None), \
-            'only one of `size` and `size_divisor` can be set'
+            'only one of `min_size` and `size_divisor` can be set'
         assert padding_mode in ['constant', 'edge', 'reflect', 'symmetric']
         if padding is not None:
             if (min_size is not None) or (size_divisor is not None
@@ -230,28 +230,23 @@ class Flip(BaseTransform):
     """
 
     def __init__(self, direction: str = 'horizontal') -> None:
-
         valid_directions = ['horizontal', 'vertical', 'diagonal']
         assert isinstance(direction, str) and direction in valid_directions
         self.direction = direction
 
     def transform(self, results: dict) -> dict:
-        """Transform function to flip images, bounding boxes, semantic
-        segmentation map and keypoints.
+        """Transform function to flip images.
 
         Args:
             results (dict): Result dict from loading pipeline.
 
         Returns:
-            dict: Flipped results, 'img', 'gt_bboxes', 'gt_seg_map',
-            'gt_keypoints', 'flip', and 'flip_direction' keys are
+            dict: Flipped results, 'img', and 'flip_direction' keys are
             updated in result dict.
         """
         # flip image
         results['img'] = dlicv.imflip(
             results['img'], direction=self.direction)
-
-        results['flip'] = True
         results['flip_direction'] = self.direction
 
         return results

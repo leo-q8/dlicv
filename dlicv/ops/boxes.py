@@ -47,6 +47,36 @@ def clip_boxes(boxes: BoxType,
         clipped_boxes = np.maximum(np.minimum(boxes, cmin), 0)
     return clipped_boxes
 
+def flip_boxes(boxes: BoxType,
+               img_shape: Tuple[int],
+               direction: str = 'horizontal') -> Tensor:
+    """Flip bboxes horizontally or vertically.
+
+    Args:
+        bboxes (Tensor): Shape (..., 4*k)
+        img_shape (Tuple[int]): Image shape.
+        direction (str): Flip direction, options are "horizontal", "vertical",
+            "diagonal". Default: "horizontal"
+
+    Returns:
+        Tensor: Flipped bboxes.
+    """
+    assert boxes.shape[-1] % 4 == 0
+    assert direction in ['horizontal', 'vertical', 'diagonal']
+    flipped = boxes.clone() if isinstance(boxes, Tensor) else np.copy(boxes)
+    if direction == 'horizontal':
+        flipped[..., 0::4] = img_shape[1] - boxes[..., 2::4]
+        flipped[..., 2::4] = img_shape[1] - boxes[..., 0::4]
+    elif direction == 'vertical':
+        flipped[..., 1::4] = img_shape[0] - boxes[..., 3::4]
+        flipped[..., 3::4] = img_shape[0] - boxes[..., 1::4]
+    else:
+        flipped[..., 0::4] = img_shape[1] - boxes[..., 2::4]
+        flipped[..., 1::4] = img_shape[0] - boxes[..., 3::4]
+        flipped[..., 2::4] = img_shape[1] - boxes[..., 0::4]
+        flipped[..., 3::4] = img_shape[0] - boxes[..., 1::4]
+    return flipped
+
 
 def resize_boxes(boxes: BoxType,
                  scale_factor: Tuple[int, int]) -> BoxType:
