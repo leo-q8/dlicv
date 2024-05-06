@@ -189,7 +189,7 @@ class BasePredictor(metaclass=PredictorMeta):
                                                         **visualize_kwargs)
                     results.append(merge_result)
                     if aug_visualizations is not None:
-                        visualizations.append(aug_visualizations[1])   
+                        visualizations.append(aug_visualizations[-1])   
                     aug_results, ori_imgs = [], []
             else:
                 results.extend(batch_results)
