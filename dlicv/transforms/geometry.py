@@ -84,7 +84,7 @@ class Resize(BaseTransform):
         repr_str = self.__class__.__name__
         repr_str += f'(size={self.size}, '
         repr_str += f'scale_factor={self.scale_factor}, '
-        repr_str += f'interpolation={self.interpolation}'
+        repr_str += f'interpolation={self.interpolation}, '
         repr_str += f'backend={self.backend}, '
         repr_str += f'antialias={self.antialias})'
         return repr_str

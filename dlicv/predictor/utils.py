@@ -1,9 +1,5 @@
-import random
-import warnings
 from typing import Any, Mapping, Sequence
 
-import numpy as np
-import torch
 from torch.utils.data._utils.collate import \
     default_collate as torch_default_collate
 

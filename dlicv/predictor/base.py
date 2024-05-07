@@ -43,13 +43,13 @@ class PredictorMeta(ABCMeta):
         super().__init__(*args, **kwargs)
         expt_args = {'self', 'kwargs'}
         self.preprocess_kwargs = set(inspect.signature(
-            self.preprocess).parameters.keys()) - expt_args
+            self.preprocess).parameters) - expt_args
         self.forward_kwargs = set(inspect.signature(
-            self.forward).parameters.keys()) - expt_args
-        self.postprocess_kwargs = set(inspect.signature(
-            self.postprocess).parameters.keys()) - expt_args
+            self.forward).parameters) - expt_args
         self.visualize_kwargs = set(inspect.signature(
-            self.visualize).parameters.keys()) - expt_args
+            self.visualize).parameters) - expt_args
+        self.postprocess_kwargs = set(inspect.signature(
+            self.postprocess).parameters) - expt_args
 
         self.all_kwargs = self.preprocess_kwargs | self.forward_kwargs | \
             self.visualize_kwargs | self.postprocess_kwargs
@@ -59,8 +59,8 @@ class PredictorMeta(ABCMeta):
         kwargs_list = [
             KwargsTuple('preprocess', self.preprocess_kwargs),
             KwargsTuple('forward', self.forward_kwargs),
-            KwargsTuple('postprocess', self.postprocess_kwargs),
-            KwargsTuple('visualize', self.visualize_kwargs)
+            KwargsTuple('visualize', self.visualize_kwargs),
+            KwargsTuple('postprocess', self.postprocess_kwargs)
         ]
         for i, kwt1 in enumerate(kwargs_list):
             for kwt2 in kwargs_list[i+1:]:
@@ -444,18 +444,18 @@ class BasePredictor(metaclass=PredictorMeta):
 
         preprocess_kwargs = {}
         forward_kwargs = {}
-        postprocess_kwargs = {}
         visualize_kwargs = {}
+        postprocess_kwargs = {}
 
         for key, value in kwargs.items():
             if key in self.preprocess_kwargs:
                 preprocess_kwargs[key] = value
             elif key in self.forward_kwargs:
                 forward_kwargs[key] = value
-            elif key in self.postprocess_kwargs:
-                postprocess_kwargs[key] = value
-            else:
+            elif key in self.visualize_kwargs:
                 visualize_kwargs[key] = value
+            else:
+                postprocess_kwargs[key] = value
 
         return (
             preprocess_kwargs,
