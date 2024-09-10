@@ -140,7 +140,7 @@ As an example, let's illustrate the usage of `BaseDetector` with object detectio
 import urllib.resuest
 
 import torch
-from dlicv import BackendModel, BaseClassifier
+from dlicv import BackendModel, BaseDetector
 from dlicv.transform import *
 
 # Download an example image from the ultralytics website
